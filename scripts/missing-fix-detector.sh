@@ -31,6 +31,108 @@ check_git_identity() {
     return 0
 }
 
+# Trouver le commit original d'un commit cherry-pickée
+find_cherry_pick_original() {
+    local commit=$1
+    local commit_msg=$(git show --format='%B' -s "$commit" 2>/dev/null)
+    
+    # Chercher le pattern "(cherry picked from commit xxxxxxx)"
+    local original_commit=$(echo "$commit_msg" | grep -o "cherry picked from commit [a-f0-9]\{7,40\}" | sed 's/cherry picked from commit //')
+    
+    if [ -n "$original_commit" ]; then
+        echo "$original_commit"
+        return 0
+    fi
+    return 1
+}
+
+# Trouver tous les commits cherry-pickés d'un commit original
+find_cherry_pick_copies() {
+    local original_commit=$1
+    
+    # Chercher dans toutes les branches les commits qui référencent ce commit original
+    git log --all --grep="cherry picked from commit $original_commit" --format="%H" 2>/dev/null
+}
+
+# Propager automatiquement les notes vers les commits cherry-pickés
+propagate_to_cherry_picks() {
+    local commit=$1
+    local ref_type=$2  # "bugs" ou "fixes"
+    local note_content=$3
+    
+    # Trouver tous les cherry-picks de ce commit
+    local cherry_picks=$(find_cherry_pick_copies "$commit")
+    
+    if [ -n "$cherry_picks" ]; then
+        echo "$cherry_picks" | while read cherry_commit; do
+            if [ -n "$cherry_commit" ]; then
+                # Vérifier si une note n'existe pas déjà
+                if ! git notes --ref="$ref_type" show "$cherry_commit" >/dev/null 2>&1; then
+                    git notes --ref="$ref_type" add -m "$note_content" "$cherry_commit" 2>/dev/null
+                    local short_cherry=$(git rev-parse --short "$cherry_commit")
+                    local short_original=$(git rev-parse --short "$commit")
+                    echo -e "${BLUE}  ↳ Note propagée vers cherry-pick: $short_cherry (depuis $short_original)${NC}"
+                fi
+            fi
+        done
+    fi
+}
+
+# Obtenir tous les commits liés (original + cherry-picks)
+get_related_commits() {
+    local commit=$1
+    local related_commits="$commit"
+    
+    # Si c'est un cherry-pick, ajouter le commit original
+    local original=$(find_cherry_pick_original "$commit")
+    if [ -n "$original" ]; then
+        related_commits="$related_commits $original"
+    fi
+    
+    # Ajouter tous les cherry-picks de ce commit
+    local cherry_picks=$(find_cherry_pick_copies "$commit")
+    if [ -n "$cherry_picks" ]; then
+        related_commits="$related_commits $cherry_picks"
+    fi
+    
+    # Si on avait trouvé un original, chercher aussi ses autres cherry-picks
+    if [ -n "$original" ]; then
+        local original_cherry_picks=$(find_cherry_pick_copies "$original")
+        if [ -n "$original_cherry_picks" ]; then
+            related_commits="$related_commits $original_cherry_picks"
+        fi
+    fi
+    
+    # Retourner la liste unique
+    echo "$related_commits" | tr ' ' '\n' | sort -u | tr '\n' ' '
+}
+
+# Propager automatiquement les notes depuis les commits originaux
+propagate_from_original() {
+    local commit=$1
+    local ref_type=$2  # "bugs" ou "fixes"
+    
+    # Vérifier si ce commit est un cherry-pick
+    local original_commit=$(find_cherry_pick_original "$commit")
+    
+    if [ -n "$original_commit" ]; then
+        # Récupérer la note du commit original
+        local original_note=$(git notes --ref="$ref_type" show "$original_commit" 2>/dev/null)
+        
+        if [ -n "$original_note" ]; then
+            # Vérifier si une note n'existe pas déjà sur ce commit
+            if ! git notes --ref="$ref_type" show "$commit" >/dev/null 2>&1; then
+                git notes --ref="$ref_type" add -m "$original_note" "$commit" 2>/dev/null
+                local short_cherry=$(git rev-parse --short "$commit")
+                local short_original=$(git rev-parse --short "$original_commit")
+                echo -e "${BLUE}  ↳ Note héritée depuis original: $short_original → $short_cherry${NC}"
+                return 0
+            fi
+        fi
+    fi
+    return 1
+}
+
 # Marquer un commit comme bug
 mark_bug() {
     local bug_commit=$1
@@ -60,6 +162,10 @@ mark_bug() {
     fi
     echo -e "${GREEN}✓ Bug $bug_id marqué sur commit $bug_commit${NC}"
     echo -e "  Description: $description"
+    
+    # Propager automatiquement vers les commits cherry-pickés
+    echo -e "${BLUE}🔄 Recherche de commits cherry-pickés...${NC}"
+    propagate_to_cherry_picks "$bug_commit" "$BUG_NOTES_REF" "BUG:$bug_id:$description"
 }
 
 # Marquer un commit comme correction d'un bug spécifique
@@ -95,6 +201,10 @@ mark_fix() {
         exit 1
     fi
     echo -e "${GREEN}✓ Correction $bug_id marquée sur commit $fix_commit (corrige $bug_commit)${NC}"
+    
+    # Propager automatiquement vers les commits cherry-pickés
+    echo -e "${BLUE}🔄 Recherche de commits cherry-pickés...${NC}"
+    propagate_to_cherry_picks "$fix_commit" "$FIX_NOTES_REF" "FIX:$bug_id:fixes-commit:$bug_commit"
 }
 
 # Lister tous les bugs marqués
@@ -164,12 +274,22 @@ detect_missing_fixes() {
     echo -e "${BLUE}🔍 Analyse de $target_branch pour détecter les corrections manquantes...${NC}"
     echo ""
     
+    # 0. D'abord, hériter automatiquement les notes des commits originaux vers les cherry-picks
+    echo -e "${BLUE}🔄 Héritage automatique des notes depuis les commits originaux...${NC}"
+    local target_commits=$(git rev-list "$target_branch")
+    for commit in $target_commits; do
+        # Essayer d'hériter les notes de bugs
+        propagate_from_original "$commit" "$BUG_NOTES_REF" >/dev/null 2>&1
+        # Essayer d'hériter les notes de fixes
+        propagate_from_original "$commit" "$FIX_NOTES_REF" >/dev/null 2>&1
+    done
+    echo ""
+    
     local missing_fixes=0
     local temp_file="/tmp/missing_fixes_$$"
     rm -f "$temp_file"
     
     # 1. Lister tous les commits de la branche cible
-    local target_commits=$(git rev-list "$target_branch")
     for commit in $target_commits; do
         
         # 2. Vérifier si ce commit a une note de bug
@@ -184,12 +304,22 @@ detect_missing_fixes() {
             # 3. Chercher si une correction existe dans la branche cible
             local fix_in_target=false
             local target_commits=$(git rev-list "$target_branch")
+            
+            # Obtenir tous les commits liés (original + cherry-picks) pour ce bug
+            local related_commits=$(get_related_commits "$commit")
+            
             for potential_fix in $target_commits; do
-                if git notes --ref=$FIX_NOTES_REF show "$potential_fix" 2>/dev/null | grep -q "FIX:$bug_id:"; then
-                    fix_in_target=true
-                    fix_short=$(git rev-parse --short "$potential_fix")
-                    echo -e "  ${GREEN}✅ Correction trouvée dans $target_branch: commit $fix_short${NC}"
-                    break
+                # Vérifier si cette correction référence n'importe lequel des commits liés
+                local fix_note=$(git notes --ref=$FIX_NOTES_REF show "$potential_fix" 2>/dev/null)
+                if [ -n "$fix_note" ]; then
+                    for related_commit in $related_commits; do
+                        if echo "$fix_note" | grep -q "FIX:$bug_id:fixes-commit:$related_commit"; then
+                            fix_in_target=true
+                            fix_short=$(git rev-parse --short "$potential_fix")
+                            echo -e "  ${GREEN}✅ Correction trouvée dans $target_branch: commit $fix_short${NC}"
+                            break 2  # Sortir des deux boucles
+                        fi
+                    done
                 fi
             done
             
@@ -213,15 +343,22 @@ detect_missing_fixes() {
                         # Vérifier chaque commit de cette branche
                         while read -r potential_fix; do
                             if [ -n "$potential_fix" ]; then
-                                if git notes --ref=$FIX_NOTES_REF show "$potential_fix" 2>/dev/null | grep -q "FIX:$bug_id:fixes-commit:$commit"; then
-                                    fix_short=$(git rev-parse --short "$potential_fix")
-                                    echo -e "  ${RED}🚨 CORRECTION TROUVÉE sur $other_branch: commit $fix_short${NC}"
-                                    echo -e "     ${RED}➜ Bug $bug_id présent dans $target_branch mais corrigé ailleurs!${NC}"
-                                    
-                                    # Enregistrer pour le rapport final
-                                    echo "$bug_id|$commit|$potential_fix|$other_branch|$bug_desc" >> "$temp_file"
-                                    fix_found_elsewhere=true
-                                    break
+                                # Vérifier si cette correction référence n'importe lequel des commits liés
+                                local fix_note=$(git notes --ref=$FIX_NOTES_REF show "$potential_fix" 2>/dev/null)
+                                if [ -n "$fix_note" ]; then
+                                    for related_commit in $related_commits; do
+                                        if echo "$fix_note" | grep -q "FIX:$bug_id:fixes-commit:$related_commit"; then
+                                            fix_short=$(git rev-parse --short "$potential_fix")
+                                            related_short=$(git rev-parse --short "$related_commit")
+                                            echo -e "  ${RED}🚨 CORRECTION TROUVÉE sur $other_branch: commit $fix_short${NC}"
+                                            echo -e "     ${RED}➜ Corrige commit lié $related_short (bug $bug_id présent dans $target_branch)${NC}"
+                                            
+                                            # Enregistrer pour le rapport final
+                                            echo "$bug_id|$commit|$potential_fix|$other_branch|$bug_desc" >> "$temp_file"
+                                            fix_found_elsewhere=true
+                                            break 2  # Sortir des deux boucles
+                                        fi
+                                    done
                                 fi
                             fi
                         done < "$commits_to_check"
