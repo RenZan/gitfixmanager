@@ -65,6 +65,70 @@ gfm check release/v2.1.0
 - **⚡ Ultra-rapide** : 5 secondes pour marquer un bug vs 30 secondes avant
 - **🌍 Multi-plateforme** : Linux, macOS, Windows (WSL)
 
+## 🎯 Marquage sur N'importe Quel Commit
+
+**⭐ FONCTIONNALITÉ CLÉ** : Vous pouvez marquer des bugs/corrections sur n'importe quel commit, pas seulement HEAD !
+
+### 🐛 Marquer des Bugs Historiques
+
+```bash
+# Bug sur le commit actuel (défaut)
+gfm bug "Memory leak in login"
+
+# Bug sur un commit spécifique (par hash)
+gfm bug "Security vulnerability" abc1234
+
+# Bug sur un commit relatif
+gfm bug "Regression introduced" HEAD~3
+
+# Bug sur un tag ou une branche
+gfm bug "Critical bug in release" v1.0.0
+gfm bug "Issue in feature" feature/oauth
+```
+
+### 🔧 Marquer des Corrections Historiques
+
+```bash
+# Correction sur le commit actuel (défaut)
+gfm fix BUG-20250918-A1B2
+
+# Correction sur un commit spécifique
+gfm fix BUG-20250918-A1B2 def5678
+
+# Correction sur un commit relatif
+gfm fix BUG-20250918-A1B2 HEAD~1
+
+# Correction sur une autre branche
+gfm fix BUG-20250918-A1B2 hotfix/security-patch
+```
+
+### 💡 Cas d'Usage Typiques
+
+**Audit de sécurité** :
+```bash
+# Après découverte d'une faille dans un ancien commit
+gfm bug "SQL injection vulnerability" v1.2.3
+# Puis marquer la correction récente
+gfm fix BUG-20250918-XXXX
+```
+
+**Analyse post-mortem** :
+```bash
+# Marquer le commit qui a introduit le bug
+gfm bug "Performance regression" 89abc12
+# Marquer tous les commits de correction
+gfm fix BUG-20250918-YYYY fix-commit-1
+gfm fix BUG-20250918-YYYY fix-commit-2  
+```
+
+**Backport tracking** :
+```bash
+# Bug trouvé sur main, déjà corrigé sur develop
+gfm bug "Cache invalidation bug" main
+gfm fix BUG-20250918-ZZZZ develop
+# → Système détectera que la correction manque sur main
+```
+
 ## 📖 Guide Rapide
 
 ### Cas d'Usage Quotidiens
@@ -95,22 +159,6 @@ gfm fix BUG-20250918-B8C9
 # Release Manager vérifie
 gfm check release/v2.1.0
 # → 🚨 Correction manquante ! Cherry-pick suggéré
-```
-
-### Marquage sur Commits Spécifiques
-
-```bash
-# Bug sur commit actuel (défaut)
-gfm bug "Performance issue"
-
-# Bug sur commit spécifique
-gfm bug "Security vulnerability" abc1234
-
-# Bug sur référence relative
-gfm bug "Regression introduced" HEAD~3
-
-# Bug sur tag/branche
-gfm bug "Critical bug in release" v1.0.0
 ```
 
 ## ✅ Vérification Avant Push
@@ -147,13 +195,15 @@ git push origin v1.0.0      # � Push en toute sécurité
 
 | Commande | Raccourci | Description | Exemple |
 |----------|-----------|-------------|---------|
-| `gfm bug` | `gfm b` | Marquer un bug | `gfm bug "Memory leak"` |
-| `gfm fix` | `gfm f` | Marquer une correction | `gfm fix BUG-001` |
+| `gfm bug` | `gfm b` | Marquer un bug | `gfm bug "Memory leak" [commit]` |
+| `gfm fix` | `gfm f` | Marquer une correction | `gfm fix BUG-001 [commit]` |
 | `gfm check` | `gfm c` | Vérifier corrections | `gfm check release/v1.0` |
 | `gfm list` | `gfm l` | Lister bugs/fixes | `gfm list bugs` |
 | `gfm status` | `gfm s` | Statut repository | `gfm status` |
 | `gfm interactive` | `gfm i` | Mode guidé | `gfm interactive` |
 | `gfm help` | `gfm h` | Aide contextuelle | `gfm help fix` |
+
+> 💡 **Astuce** : `[commit]` est optionnel - si omis, utilise HEAD (commit actuel)
 
 ## 💻 Compatibilité
 
