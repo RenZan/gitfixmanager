@@ -165,6 +165,10 @@ interactive_mode() {
         2)
             echo
             echo -e "${FIX_ICON} ${BOLD}Marquer une correction${NC}"
+            echo
+            echo -e "${INFO_ICON} ${CYAN}Bugs disponibles à corriger :${NC}"
+            "$DETECTOR" list-bugs
+            echo
             echo "ID du bug corrigé :"
             read -p "> " bug_id
             if [[ -n "$bug_id" ]]; then
@@ -253,7 +257,11 @@ mark_fix_interactive() {
     
     if [[ -z "$bug_commit" ]]; then
         echo -e "${ERROR_ICON} ${RED}Bug $bug_id non trouvé${NC}"
-        echo -e "${INFO_ICON} ${CYAN}Utilisez 'gfm list bugs' pour voir les bugs disponibles${NC}"
+        echo
+        echo -e "${INFO_ICON} ${CYAN}Bugs disponibles à corriger :${NC}"
+        "$DETECTOR" list-bugs
+        echo
+        echo -e "${INFO_ICON} ${CYAN}Utilisez 'gfm fix BUG-ID' avec un ID valide${NC}"
         return 1
     fi
     
@@ -530,8 +538,13 @@ main() {
         "fix"|"f")
             shift
             if [[ $# -eq 0 ]]; then
-                echo -e "${ERROR_ICON} ${RED}ID du bug requis${NC}"
+                echo -e "${FIX_ICON} ${BOLD}Marquer une correction${NC}"
+                echo
+                echo -e "${INFO_ICON} ${CYAN}Bugs disponibles à corriger :${NC}"
+                "$DETECTOR" list-bugs
+                echo
                 echo -e "${INFO_ICON} ${CYAN}Usage: gfm fix BUG-ID${NC}"
+                echo -e "${INFO_ICON} ${CYAN}Exemple: gfm fix BUG-20250918-A1B2${NC}"
                 exit 1
             fi
             mark_fix_interactive "$1"
