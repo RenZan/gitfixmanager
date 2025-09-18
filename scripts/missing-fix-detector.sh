@@ -207,64 +207,37 @@ mark_fix() {
     propagate_to_cherry_picks "$fix_commit" "$FIX_NOTES_REF" "FIX:$bug_id:fixes-commit:$bug_commit"
 }
 
-# Lister tous les bugs marqués sans correction
+# Lister tous les bugs marqués (version ultra-rapide)
 list_bugs() {
     echo -e "${BLUE}🐛 Liste des bugs à corriger:${NC}"
     echo "========================="
     
-    local found_any=false
-    
-    # D'abord, créer un set des bugs qui ont déjà une correction
-    local fixed_bugs=()
-    if git for-each-ref --format='%(refname)' refs/notes/$FIX_NOTES_REF 2>/dev/null | head -1 | grep -q .; then
-        while read commit; do
-            if [[ -n "$commit" ]] && git rev-parse --verify "$commit" >/dev/null 2>&1; then
-                fix_info=$(git notes --ref=$FIX_NOTES_REF show "$commit" 2>/dev/null)
-                if [[ -n "$fix_info" ]]; then
-                    bug_id=$(echo "$fix_info" | cut -d: -f2)
-                    fixed_bugs+=("$bug_id")
-                fi
-            fi
-        done < <(git for-each-ref --format='%(refname:lstrip=3)' refs/notes/$FIX_NOTES_REF 2>/dev/null)
-    fi
-    
-    # Ensuite, lister les bugs qui ne sont pas dans la liste des bugs corrigés
-    if git for-each-ref --format='%(refname)' refs/notes/$BUG_NOTES_REF 2>/dev/null | head -1 | grep -q .; then
-        while read commit; do
-            if [[ -n "$commit" ]] && git rev-parse --verify "$commit" >/dev/null 2>&1; then
+    # Version ultra-simple : juste lister tous les bugs directement
+    local output=""
+    if git for-each-ref refs/notes/$BUG_NOTES_REF >/dev/null 2>&1; then
+        output=$(git for-each-ref --format='%(refname:lstrip=3)' refs/notes/$BUG_NOTES_REF 2>/dev/null | head -10 | while read commit; do
+            if [[ -n "$commit" ]]; then
                 bug_info=$(git notes --ref=$BUG_NOTES_REF show "$commit" 2>/dev/null)
                 if [[ -n "$bug_info" ]]; then
                     bug_id=$(echo "$bug_info" | cut -d: -f2)
+                    bug_desc=$(echo "$bug_info" | cut -d: -f3-)
+                    commit_short=$(git rev-parse --short "$commit" 2>/dev/null || echo "$commit")
                     
-                    # Vérifier si ce bug a déjà une correction
-                    local is_fixed=false
-                    for fixed_bug in "${fixed_bugs[@]}"; do
-                        if [[ "$bug_id" == "$fixed_bug" ]]; then
-                            is_fixed=true
-                            break
-                        fi
-                    done
-                    
-                    # Si le bug n'a pas de correction, l'afficher
-                    if [[ "$is_fixed" == false ]]; then
-                        bug_desc=$(echo "$bug_info" | cut -d: -f3-)
-                        commit_short=$(git rev-parse --short "$commit" 2>/dev/null)
-                        
-                        echo -e "${YELLOW}Bug ID:${NC} $bug_id"
-                        echo -e "${YELLOW}Commit:${NC} $commit_short"
-                        echo -e "${YELLOW}Description:${NC} $bug_desc"
-                        echo ""
-                        found_any=true
-                    fi
+                    echo -e "${YELLOW}Bug ID:${NC} $bug_id"
+                    echo -e "${YELLOW}Commit:${NC} $commit_short"
+                    echo -e "${YELLOW}Description:${NC} $bug_desc"
+                    echo ""
                 fi
             fi
-        done < <(git for-each-ref --format='%(refname:lstrip=3)' refs/notes/$BUG_NOTES_REF 2>/dev/null)
+        done)
     fi
     
-    # Vérifier si des bugs ont été trouvés
-    if [ "$found_any" = false ]; then
-        echo -e "${YELLOW}💡 Aucun bug à corriger trouvé${NC}"
-        echo -e "${YELLOW}💡 Tous les bugs ont déjà une correction ou utilisez 'gfm bug \"description\"' pour marquer un nouveau bug${NC}"
+    # Afficher la sortie ou le message par défaut
+    if [[ -n "$output" ]]; then
+        echo "$output"
+    else
+        echo -e "${YELLOW}💡 Aucun bug marqué trouvé${NC}"
+        echo -e "${YELLOW}💡 Utilisez 'gfm bug \"description\"' pour marquer un bug${NC}"
     fi
 }
 
