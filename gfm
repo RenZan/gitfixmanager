@@ -276,6 +276,13 @@ select_bug_interactive() {
         return 1
     fi
     
+    # Debug temporaire
+    echo -e "${INFO_ICON} ${CYAN}DEBUG: Sortie du détecteur:${NC}"
+    echo "=== DEBUT SORTIE ==="
+    echo "$output"
+    echo "=== FIN SORTIE ==="
+    echo -e "${INFO_ICON} ${CYAN}DEBUG: Longueur sortie: ${#output} caractères${NC}"
+    
     # Vérifier que la sortie n'est pas vide
     if [[ -z "$output" ]]; then
         echo -e "${INFO_ICON} ${YELLOW}Aucun bug marqué trouvé${NC}"
@@ -314,7 +321,10 @@ select_bug_interactive() {
         bug_ids+=("$current_bug")
         bug_commits+=("$current_commit")
         bug_descriptions+=("$current_desc")
+        echo -e "${INFO_ICON} ${CYAN}DEBUG: Bug ajouté: $current_bug${NC}"
     fi
+    
+    echo -e "${INFO_ICON} ${CYAN}DEBUG: Nombre de bugs trouvés: ${#bug_ids[@]}${NC}"
     
     # Vérifier qu'on a des bugs
     if [[ ${#bug_ids[@]} -eq 0 ]]; then
