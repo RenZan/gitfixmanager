@@ -288,35 +288,24 @@ select_bug_interactive() {
     local current_commit=""
     local current_desc=""
     
-    # Debug temporaire
-    echo -e "${INFO_ICON} ${CYAN}Debug: Parsing de la sortie...${NC}"
-    echo "=== DEBUG OUTPUT START ==="
-    echo "$output"
-    echo "=== DEBUG OUTPUT END ==="
-    
     while IFS= read -r line; do
         # Nettoyer les codes ANSI
         local clean_line=$(echo "$line" | sed 's/\x1b\[[0-9;]*m//g')
-        echo -e "${INFO_ICON} ${CYAN}Debug: ligne nettoyée: '$clean_line'${NC}"
         
         if [[ "$clean_line" =~ ^Bug\ ID:\ (BUG-[0-9]{8}-[A-F0-9]{4}) ]]; then
-            echo -e "${INFO_ICON} ${CYAN}Debug: Bug ID trouvé: ${BASH_REMATCH[1]}${NC}"
             # Nouveau bug trouvé - sauvegarder le précédent s'il existe
             if [[ -n "$current_bug" && -n "$current_commit" && -n "$current_desc" ]]; then
                 bug_ids+=("$current_bug")
                 bug_commits+=("$current_commit")
                 bug_descriptions+=("$current_desc")
-                echo -e "${INFO_ICON} ${CYAN}Debug: Bug ajouté: $current_bug${NC}"
             fi
             current_bug="${BASH_REMATCH[1]}"
             current_commit=""
             current_desc=""
         elif [[ "$clean_line" =~ ^Commit:\ ([a-f0-9]{7}) ]]; then
             current_commit="${BASH_REMATCH[1]}"
-            echo -e "${INFO_ICON} ${CYAN}Debug: Commit trouvé: $current_commit${NC}"
         elif [[ "$clean_line" =~ ^Description:\ (.+)$ ]]; then
             current_desc="${BASH_REMATCH[1]}"
-            echo -e "${INFO_ICON} ${CYAN}Debug: Description trouvée: $current_desc${NC}"
         fi
     done <<< "$output"
     
