@@ -247,31 +247,57 @@ select_bug_interactive() {
     echo -e "${CYAN}========================================${NC}"
     echo
     
-    # Extraire les bug IDs de manière ultra-simple
-    local bug_list
-    bug_list=$("$DETECTOR" list-bugs | grep -o 'BUG-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-[A-F0-9][A-F0-9][A-F0-9][A-F0-9]')
+    # Récupérer les informations complètes des bugs
+    local bug_data=()
+    local temp_output=$(mktemp)
+    "$DETECTOR" list-bugs > "$temp_output"
     
-    if [[ -z "$bug_list" ]]; then
+    # Parser les informations des bugs
+    local current_bug_id=""
+    local current_commit=""
+    local current_description=""
+    
+    while IFS= read -r line; do
+        # Nettoyer les codes ANSI pour le parsing
+        local clean_line=$(echo "$line" | sed 's/\x1b\[[0-9;]*m//g')
+        
+        if [[ "$clean_line" =~ Bug\ ID:\ (BUG-[0-9]{8}-[A-F0-9]{4}) ]]; then
+            current_bug_id="${BASH_REMATCH[1]}"
+        elif [[ "$clean_line" =~ Commit:\ ([a-f0-9]{7}) ]]; then
+            current_commit="${BASH_REMATCH[1]}"
+        elif [[ "$clean_line" =~ Description:\ (.+) ]]; then
+            current_description="${BASH_REMATCH[1]}"
+            # Une fois qu'on a les 3 infos, ajouter au tableau
+            if [[ -n "$current_bug_id" && -n "$current_commit" && -n "$current_description" ]]; then
+                bug_data+=("$current_bug_id|$current_commit|$current_description")
+                current_bug_id=""
+                current_commit=""
+                current_description=""
+            fi
+        fi
+    done < "$temp_output"
+    
+    rm -f "$temp_output"
+    
+    if [[ ${#bug_data[@]} -eq 0 ]]; then
         echo -e "${INFO_ICON} ${YELLOW}Aucun bug à corriger trouvé${NC}"
         return 1
     fi
     
-    # Convertir en tableau
-    local bug_ids=($bug_list)
-    
-    if [[ ${#bug_ids[@]} -eq 0 ]]; then
-        echo -e "${INFO_ICON} ${YELLOW}Aucun bug à corriger trouvé${NC}"
-        return 1
-    fi
-    
-    # Afficher la liste
+    # Afficher la liste avec descriptions
     local index=1
-    for bug_id in "${bug_ids[@]}"; do
-        echo -e "  ${BOLD}${YELLOW}[$index]${NC} ${BOLD}${bug_id}${NC}"
+    local bug_ids=()
+    
+    for bug_info in "${bug_data[@]}"; do
+        IFS='|' read -r bug_id commit description <<< "$bug_info"
+        bug_ids+=("$bug_id")
+        
+        echo -e "  ${BOLD}${YELLOW}[$index]${NC} ${BOLD}${bug_id}${NC} ${CYAN}(${commit})${NC}"
+        echo -e "      ${description}"
+        echo
         ((index++))
     done
     
-    echo
     echo -e "${INFO_ICON} ${CYAN}Correction sera marquée sur commit: ${BOLD}$(git rev-parse --short HEAD)${NC}"
     echo
     
