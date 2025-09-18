@@ -212,30 +212,28 @@ list_bugs() {
     echo -e "${BLUE}🐛 Liste des bugs à corriger:${NC}"
     echo "========================="
     
-    # Version ultra-simple : juste lister tous les bugs directement
-    local output=""
-    if git for-each-ref refs/notes/$BUG_NOTES_REF >/dev/null 2>&1; then
-        output=$(git for-each-ref --format='%(refname:lstrip=3)' refs/notes/$BUG_NOTES_REF 2>/dev/null | head -10 | while read commit; do
-            if [[ -n "$commit" ]]; then
-                bug_info=$(git notes --ref=$BUG_NOTES_REF show "$commit" 2>/dev/null)
-                if [[ -n "$bug_info" ]]; then
-                    bug_id=$(echo "$bug_info" | cut -d: -f2)
-                    bug_desc=$(echo "$bug_info" | cut -d: -f3-)
-                    commit_short=$(git rev-parse --short "$commit" 2>/dev/null || echo "$commit")
-                    
-                    echo -e "${YELLOW}Bug ID:${NC} $bug_id"
-                    echo -e "${YELLOW}Commit:${NC} $commit_short"
-                    echo -e "${YELLOW}Description:${NC} $bug_desc"
-                    echo ""
-                fi
-            fi
-        done)
-    fi
+    # Version ultra-simple et efficace
+    local found_any=false
     
-    # Afficher la sortie ou le message par défaut
-    if [[ -n "$output" ]]; then
-        echo "$output"
-    else
+    # Utiliser git notes list pour obtenir les commits qui ont des notes
+    git notes --ref=$BUG_NOTES_REF list 2>/dev/null | while read note_obj commit; do
+        if [[ -n "$commit" ]]; then
+            bug_info=$(git notes --ref=$BUG_NOTES_REF show "$commit" 2>/dev/null)
+            if [[ -n "$bug_info" ]]; then
+                bug_id=$(echo "$bug_info" | cut -d: -f2)
+                bug_desc=$(echo "$bug_info" | cut -d: -f3-)
+                commit_short=$(git rev-parse --short "$commit" 2>/dev/null)
+                
+                echo -e "${YELLOW}Bug ID:${NC} $bug_id"
+                echo -e "${YELLOW}Commit:${NC} $commit_short"
+                echo -e "${YELLOW}Description:${NC} $bug_desc"
+                echo ""
+            fi
+        fi
+    done
+    
+    # Vérifier si des notes existent
+    if ! git notes --ref=$BUG_NOTES_REF list >/dev/null 2>&1; then
         echo -e "${YELLOW}💡 Aucun bug marqué trouvé${NC}"
         echo -e "${YELLOW}💡 Utilisez 'gfm bug \"description\"' pour marquer un bug${NC}"
     fi
