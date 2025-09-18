@@ -8,21 +8,15 @@
 
 Évitez les oublis de backport et assurez-vous que tous vos bugs ont leurs corrections dans les bonnes branches !
 
-## ✨ Avant/Après
+## ✨ Interface Ultra-Simple
 
-**AVANT** (complexe) :
-```bash
-./scripts/missing-fix-detector.sh mark-bug abc1234 "BUG-001" "Memory leak"
-./scripts/missing-fix-detector.sh mark-fix def5678 "BUG-001" abc1234
-./scripts/missing-fix-detector.sh check release/v1.0
-```
-
-**MAINTENANT** (ultra-simple) :
 ```bash
 gfm bug "Memory leak"              # Auto-génère ID, détecte commit
 gfm fix BUG-20250918-XXXX         # Auto-résout le bug
 gfm check release/v1.0             # Vérification complète
 ```
+
+**C'est tout !** Trois commandes pour gérer tous vos bugs et corrections.
 
 ## ⚡ Installation Rapide
 
