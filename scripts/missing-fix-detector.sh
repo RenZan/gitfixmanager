@@ -212,14 +212,10 @@ list_bugs() {
     echo -e "${BLUE}🐛 Liste des bugs marqués:${NC}"
     echo "========================="
     
-    local found_bugs=false
-    git for-each-ref --format='%(refname:short)' refs/notes/$BUG_NOTES_REF 2>/dev/null | while read note_ref; do
-        if [ -n "$note_ref" ]; then
-            found_bugs=true
-        fi
-    done
+    local found_any=false
     
-    git rev-list --all | while read commit; do
+    # Chercher tous les commits avec des notes de bug
+    for commit in $(git rev-list --all); do
         if git notes --ref=$BUG_NOTES_REF show "$commit" >/dev/null 2>&1; then
             bug_info=$(git notes --ref=$BUG_NOTES_REF show "$commit")
             bug_id=$(echo "$bug_info" | cut -d: -f2)
@@ -227,11 +223,18 @@ list_bugs() {
             commit_short=$(git rev-parse --short "$commit")
             
             echo -e "${YELLOW}Bug ID:${NC} $bug_id"
-            echo -e "${YELLOW}Commit:${NC} $commit_short ($commit)"
+            echo -e "${YELLOW}Commit:${NC} $commit_short"
             echo -e "${YELLOW}Description:${NC} $bug_desc"
             echo ""
+            found_any=true
         fi
     done
+    
+    # Vérifier si des bugs ont été trouvés
+    if [ "$found_any" = false ]; then
+        echo -e "${YELLOW}💡 Aucun bug marqué trouvé${NC}"
+        echo -e "${YELLOW}💡 Utilisez 'gfm bug \"description\"' pour marquer un bug${NC}"
+    fi
 }
 
 # Lister toutes les corrections marquées
