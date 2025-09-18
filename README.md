@@ -129,11 +129,12 @@ gfm check v1.0.0
 ```
 
 **🎯 Bonne pratique** : Toujours faire `gfm check` avant un `git push` important !
-git push origin v1.0.0
-# 🛡️ PROTECTION ACTIVÉE
-# 🚨 Tag contient 2 bugs non corrigés
-# ❌ PUSH BLOQUÉ
-# 💡 Commandes de correction affichées
+
+```bash
+# Exemple de workflow recommandé
+git commit -m "Fix critical bug"
+gfm check                    # ✅ Vérification avant push
+git push origin v1.0.0      # � Push en toute sécurité
 ```
 
 ## 📚 Documentation
