@@ -264,94 +264,56 @@ select_bug_interactive() {
     echo -e "${CYAN}========================================${NC}"
     echo
     
-    # Méthode plus simple : extraire directement depuis la sortie
+    # Appel direct du détecteur et parsing simple
+    local output=$("$DETECTOR" list-bugs 2>/dev/null)
+    
+    if [[ -z "$output" ]]; then
+        echo -e "${INFO_ICON} ${YELLOW}Aucun bug marqué trouvé${NC}"
+        return 1
+    fi
+    
+    # Parser simplement avec des tableaux
     local bug_ids=()
     local bug_commits=()
     local bug_descriptions=()
-    
-    # Capturer la sortie complète et vérifier qu'elle n'est pas vide
-    local output
-    if ! output=$("$DETECTOR" list-bugs 2>/dev/null); then
-        echo -e "${ERROR_ICON} ${RED}Erreur lors de la récupération de la liste des bugs${NC}"
-        return 1
-    fi
-    
-    # Debug temporaire
-    echo -e "${INFO_ICON} ${CYAN}DEBUG: Sortie du détecteur:${NC}"
-    echo "=== DEBUT SORTIE ==="
-    echo "$output"
-    echo "=== FIN SORTIE ==="
-    echo -e "${INFO_ICON} ${CYAN}DEBUG: Longueur sortie: ${#output} caractères${NC}"
-    
-    # Vérifier que la sortie n'est pas vide
-    if [[ -z "$output" ]]; then
-        echo -e "${INFO_ICON} ${YELLOW}Aucun bug marqué trouvé${NC}"
-        echo -e "${INFO_ICON} ${CYAN}Utilisez d'abord 'gfm bug \"description\"' pour marquer un bug${NC}"
-        return 1
-    fi
-    
-    # Parser ligne par ligne avec une approche plus robuste
-    local current_bug=""
-    local current_commit=""
-    local current_desc=""
     
     while IFS= read -r line; do
         # Nettoyer les codes ANSI
         local clean_line=$(echo "$line" | sed 's/\x1b\[[0-9;]*m//g')
         
         if [[ "$clean_line" =~ ^Bug\ ID:\ (BUG-[0-9]{8}-[A-F0-9]{4}) ]]; then
-            # Nouveau bug trouvé - sauvegarder le précédent s'il existe
-            if [[ -n "$current_bug" && -n "$current_commit" && -n "$current_desc" ]]; then
-                bug_ids+=("$current_bug")
-                bug_commits+=("$current_commit")
-                bug_descriptions+=("$current_desc")
-            fi
-            current_bug="${BASH_REMATCH[1]}"
-            current_commit=""
-            current_desc=""
+            bug_ids+=("${BASH_REMATCH[1]}")
         elif [[ "$clean_line" =~ ^Commit:\ ([a-f0-9]{7}) ]]; then
-            current_commit="${BASH_REMATCH[1]}"
+            bug_commits+=("${BASH_REMATCH[1]}")
         elif [[ "$clean_line" =~ ^Description:\ (.+)$ ]]; then
-            current_desc="${BASH_REMATCH[1]}"
+            bug_descriptions+=("${BASH_REMATCH[1]}")
         fi
     done <<< "$output"
     
-    # Ajouter le dernier bug
-    if [[ -n "$current_bug" && -n "$current_commit" && -n "$current_desc" ]]; then
-        bug_ids+=("$current_bug")
-        bug_commits+=("$current_commit")
-        bug_descriptions+=("$current_desc")
-        echo -e "${INFO_ICON} ${CYAN}DEBUG: Bug ajouté: $current_bug${NC}"
-    fi
-    
-    echo -e "${INFO_ICON} ${CYAN}DEBUG: Nombre de bugs trouvés: ${#bug_ids[@]}${NC}"
-    
-    # Vérifier qu'on a des bugs
     if [[ ${#bug_ids[@]} -eq 0 ]]; then
         echo -e "${INFO_ICON} ${YELLOW}Aucun bug à corriger trouvé${NC}"
-        echo -e "${INFO_ICON} ${CYAN}Utilisez d'abord 'gfm bug \"description\"' pour marquer un bug${NC}"
         return 1
     fi
     
-    # Afficher la liste avec descriptions AVANT la sélection
+    # Affichage de la liste
     for i in "${!bug_ids[@]}"; do
         local index=$((i + 1))
         echo -e "  ${BOLD}${YELLOW}[$index]${NC} ${BOLD}${bug_ids[$i]}${NC} ${CYAN}(${bug_commits[$i]})${NC}"
         echo -e "      ${bug_descriptions[$i]}"
         echo
     done
-
+    
     echo -e "${INFO_ICON} ${CYAN}Correction sera marquée sur commit: ${BOLD}$(git rev-parse --short HEAD)${NC}"
     echo
-
-    # Demander la sélection
+    
+    # Sélection
     while true; do
         read -p "Choisissez un numéro (1-${#bug_ids[@]}) ou 'q' pour quitter: " choice
-
+        
         if [[ "$choice" == "q" || "$choice" == "Q" ]]; then
             return 1
         fi
-
+        
         if [[ "$choice" =~ ^[0-9]+$ ]] && [[ $choice -ge 1 ]] && [[ $choice -le ${#bug_ids[@]} ]]; then
             local selected_index=$((choice - 1))
             echo "${bug_ids[$selected_index]}"
@@ -371,8 +333,20 @@ mark_fix_interactive() {
     if [[ -z "$bug_id" ]]; then
         echo -e "${FIX_ICON} ${BOLD}Sélection interactive du bug à corriger${NC}"
         echo
-        bug_id=$(select_bug_interactive)
+        
+        # Appel avec capture de sortie via un fichier temporaire pour éviter le blocage
+        local temp_file="/tmp/gfm_selection_$$"
+        select_bug_interactive > "$temp_file"
         local select_exit_code=$?
+        
+        # Lire le résultat
+        if [[ $select_exit_code -eq 0 && -f "$temp_file" ]]; then
+            bug_id=$(tail -1 "$temp_file" | grep "BUG-")
+        fi
+        
+        # Nettoyer
+        rm -f "$temp_file"
+        
         if [[ $select_exit_code -ne 0 || -z "$bug_id" ]]; then
             echo
             echo -e "${INFO_ICON} ${YELLOW}Sélection annulée${NC}"
