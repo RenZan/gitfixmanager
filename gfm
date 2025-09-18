@@ -165,17 +165,7 @@ interactive_mode() {
         2)
             echo
             echo -e "${FIX_ICON} ${BOLD}Marquer une correction${NC}"
-            echo
-            echo -e "${INFO_ICON} ${CYAN}Bugs disponibles à corriger :${NC}"
-            "$DETECTOR" list-bugs
-            echo
-            echo "ID du bug corrigé :"
-            read -p "> " bug_id
-            if [[ -n "$bug_id" ]]; then
-                mark_fix_interactive "$bug_id"
-            else
-                echo -e "${ERROR_ICON} ID de bug requis"
-            fi
+            mark_fix_interactive
             ;;
         3)
             echo
@@ -247,10 +237,132 @@ mark_bug_interactive() {
     fi
 }
 
+# Fonction de sélection interactive avec navigation au clavier
+select_bug_interactive() {
+    # Récupérer la liste des bugs non corrigés
+    local bugs_list=$(mktemp)
+    "$DETECTOR" list-bugs | grep -E "^BUG-[0-9]{8}-[A-F0-9]{4}" | cut -d' ' -f1 > "$bugs_list"
+    
+    if [[ ! -s "$bugs_list" ]]; then
+        echo -e "${INFO_ICON} ${YELLOW}Aucun bug à corriger trouvé${NC}"
+        rm -f "$bugs_list"
+        return 1
+    fi
+    
+    local bugs_array=()
+    local bugs_descriptions=()
+    
+    # Charger la liste et récupérer les descriptions
+    while IFS= read -r bug_id; do
+        if [[ -n "$bug_id" ]]; then
+            bugs_array+=("$bug_id")
+            # Récupérer la description du bug
+            local bug_commit=$(find_bug_commit "$bug_id")
+            local description=""
+            if [[ -n "$bug_commit" ]]; then
+                description=$(git notes --ref=refs/notes/bugs show "$bug_commit" 2>/dev/null | grep -v "^BUG-" | head -1 || echo "")
+            fi
+            bugs_descriptions+=("${description:-Pas de description}")
+        fi
+    done < "$bugs_list"
+    rm -f "$bugs_list"
+    
+    if [[ ${#bugs_array[@]} -eq 0 ]]; then
+        echo -e "${INFO_ICON} ${YELLOW}Aucun bug à corriger trouvé${NC}"
+        return 1
+    fi
+    
+    local selected=0
+    local max_index=$((${#bugs_array[@]} - 1))
+    
+    # Fonction d'affichage de la liste
+    display_bug_list() {
+        clear
+        echo -e "${FIX_ICON} ${BOLD}${CYAN}Sélectionner le bug à corriger${NC}"
+        echo -e "${CYAN}========================================${NC}"
+        echo
+        echo -e "${INFO_ICON} Utilisez ${BOLD}↑/↓${NC} ou ${BOLD}j/k${NC} pour naviguer, ${BOLD}Entrée${NC} pour sélectionner, ${BOLD}q${NC} pour quitter"
+        echo
+        
+        for i in "${!bugs_array[@]}"; do
+            local bug_id="${bugs_array[$i]}"
+            local description="${bugs_descriptions[$i]}"
+            local bug_commit=$(find_bug_commit "$bug_id")
+            local short_commit=""
+            if [[ -n "$bug_commit" ]]; then
+                short_commit="$(git rev-parse --short "$bug_commit")"
+            fi
+            
+            if [[ $i -eq $selected ]]; then
+                # Ligne sélectionnée avec surbrillance
+                echo -e "  ${BOLD}${YELLOW}▶${NC} ${BOLD}${WHITE}${bug_id}${NC} ${BOLD}${CYAN}(${short_commit})${NC}"
+                echo -e "    ${BOLD}${WHITE}${description}${NC}"
+            else
+                # Ligne normale
+                echo -e "    ${bug_id} ${CYAN}(${short_commit})${NC}"
+                echo -e "    ${description}"
+            fi
+            echo
+        done
+        
+        echo -e "${INFO_ICON} ${CYAN}Correction sera marquée sur commit: ${BOLD}$(git rev-parse --short HEAD)${NC}"
+    }
+    
+    # Boucle de navigation
+    while true; do
+        display_bug_list
+        
+        # Lire une seule touche
+        read -rsn1 key
+        
+        case "$key" in
+            $'\x1b')  # Séquence d'échappement (flèches)
+                read -rsn1 -t 0.1 key2
+                if [[ "$key2" == "[" ]]; then
+                    read -rsn1 -t 0.1 key3
+                    case "$key3" in
+                        "A")  # Flèche haut
+                            ((selected > 0)) && ((selected--))
+                            ;;
+                        "B")  # Flèche bas
+                            ((selected < max_index)) && ((selected++))
+                            ;;
+                    esac
+                fi
+                ;;
+            "k"|"K")  # Vim-style: haut
+                ((selected > 0)) && ((selected--))
+                ;;
+            "j"|"J")  # Vim-style: bas
+                ((selected < max_index)) && ((selected++))
+                ;;
+            "")  # Entrée
+                echo "${bugs_array[$selected]}"
+                return 0
+                ;;
+            "q"|"Q")  # Quitter
+                return 1
+                ;;
+        esac
+    done
+}
+
 # Marquer une correction de manière interactive
 mark_fix_interactive() {
     local bug_id="$1"
     local fix_commit=$(git rev-parse HEAD)
+    
+    # Si aucun bug_id fourni, proposer la sélection interactive
+    if [[ -z "$bug_id" ]]; then
+        echo -e "${FIX_ICON} ${BOLD}Sélection interactive du bug à corriger${NC}"
+        echo
+        bug_id=$(select_bug_interactive)
+        if [[ $? -ne 0 || -z "$bug_id" ]]; then
+            echo
+            echo -e "${INFO_ICON} ${YELLOW}Sélection annulée${NC}"
+            return 1
+        fi
+    fi
     
     # Trouver le commit du bug
     local bug_commit=$(find_bug_commit "$bug_id")
@@ -538,16 +650,10 @@ main() {
         "fix"|"f")
             shift
             if [[ $# -eq 0 ]]; then
-                echo -e "${FIX_ICON} ${BOLD}Marquer une correction${NC}"
-                echo
-                echo -e "${INFO_ICON} ${CYAN}Bugs disponibles à corriger :${NC}"
-                "$DETECTOR" list-bugs
-                echo
-                echo -e "${INFO_ICON} ${CYAN}Usage: gfm fix BUG-ID${NC}"
-                echo -e "${INFO_ICON} ${CYAN}Exemple: gfm fix BUG-20250918-A1B2${NC}"
-                exit 1
+                mark_fix_interactive
+            else
+                mark_fix_interactive "$1"
             fi
-            mark_fix_interactive "$1"
             ;;
         "check"|"c")
             shift
