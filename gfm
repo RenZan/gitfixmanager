@@ -14,6 +14,10 @@ DETECTOR="$SCRIPT_DIR/scripts/missing-fix-detector.sh"
 # Support pour installation globale
 if [[ -n "${GFM_INSTALL_DIR:-}" ]]; then
     DETECTOR="$GFM_INSTALL_DIR/scripts/missing-fix-detector.sh"
+elif [[ -f "/home/renzan/.local/share/gfm/scripts/missing-fix-detector.sh" ]]; then
+    DETECTOR="/home/renzan/.local/share/gfm/scripts/missing-fix-detector.sh"
+elif [[ -f "/home/renzan/.local/share/gfm/missing-fix-detector.sh" ]]; then
+    DETECTOR="/home/renzan/.local/share/gfm/missing-fix-detector.sh"
 fi
 
 # Couleurs ANSI
@@ -237,113 +241,55 @@ mark_bug_interactive() {
     fi
 }
 
-# Fonction de sélection interactive avec navigation au clavier
+# Fonction de sélection interactive simplifiée et robuste  
 select_bug_interactive() {
-    # Récupérer la liste des bugs non corrigés
-    local bugs_list=$(mktemp)
-    "$DETECTOR" list-bugs | grep -E "^BUG-[0-9]{8}-[A-F0-9]{4}" | cut -d' ' -f1 > "$bugs_list"
+    echo -e "${FIX_ICON} ${BOLD}${CYAN}Sélectionner le bug à corriger${NC}"
+    echo -e "${CYAN}========================================${NC}"
+    echo
     
-    if [[ ! -s "$bugs_list" ]]; then
-        echo -e "${INFO_ICON} ${YELLOW}Aucun bug à corriger trouvé${NC}"
-        rm -f "$bugs_list"
-        return 1
-    fi
+    # Extraire les bug IDs de manière ultra-simple
+    local bug_list
+    bug_list=$("$DETECTOR" list-bugs | grep -o 'BUG-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-[A-F0-9][A-F0-9][A-F0-9][A-F0-9]')
     
-    local bugs_array=()
-    local bugs_descriptions=()
-    
-    # Charger la liste et récupérer les descriptions
-    while IFS= read -r bug_id; do
-        if [[ -n "$bug_id" ]]; then
-            bugs_array+=("$bug_id")
-            # Récupérer la description du bug
-            local bug_commit=$(find_bug_commit "$bug_id")
-            local description=""
-            if [[ -n "$bug_commit" ]]; then
-                description=$(git notes --ref=refs/notes/bugs show "$bug_commit" 2>/dev/null | grep -v "^BUG-" | head -1 || echo "")
-            fi
-            bugs_descriptions+=("${description:-Pas de description}")
-        fi
-    done < "$bugs_list"
-    rm -f "$bugs_list"
-    
-    if [[ ${#bugs_array[@]} -eq 0 ]]; then
+    if [[ -z "$bug_list" ]]; then
         echo -e "${INFO_ICON} ${YELLOW}Aucun bug à corriger trouvé${NC}"
         return 1
     fi
     
-    local selected=0
-    local max_index=$((${#bugs_array[@]} - 1))
+    # Convertir en tableau
+    local bug_ids=($bug_list)
     
-    # Fonction d'affichage de la liste
-    display_bug_list() {
-        clear
-        echo -e "${FIX_ICON} ${BOLD}${CYAN}Sélectionner le bug à corriger${NC}"
-        echo -e "${CYAN}========================================${NC}"
-        echo
-        echo -e "${INFO_ICON} Utilisez ${BOLD}↑/↓${NC} ou ${BOLD}j/k${NC} pour naviguer, ${BOLD}Entrée${NC} pour sélectionner, ${BOLD}q${NC} pour quitter"
-        echo
-        
-        for i in "${!bugs_array[@]}"; do
-            local bug_id="${bugs_array[$i]}"
-            local description="${bugs_descriptions[$i]}"
-            local bug_commit=$(find_bug_commit "$bug_id")
-            local short_commit=""
-            if [[ -n "$bug_commit" ]]; then
-                short_commit="$(git rev-parse --short "$bug_commit")"
-            fi
-            
-            if [[ $i -eq $selected ]]; then
-                # Ligne sélectionnée avec surbrillance
-                echo -e "  ${BOLD}${YELLOW}▶${NC} ${BOLD}${WHITE}${bug_id}${NC} ${BOLD}${CYAN}(${short_commit})${NC}"
-                echo -e "    ${BOLD}${WHITE}${description}${NC}"
-            else
-                # Ligne normale
-                echo -e "    ${bug_id} ${CYAN}(${short_commit})${NC}"
-                echo -e "    ${description}"
-            fi
-            echo
-        done
-        
-        echo -e "${INFO_ICON} ${CYAN}Correction sera marquée sur commit: ${BOLD}$(git rev-parse --short HEAD)${NC}"
-    }
+    if [[ ${#bug_ids[@]} -eq 0 ]]; then
+        echo -e "${INFO_ICON} ${YELLOW}Aucun bug à corriger trouvé${NC}"
+        return 1
+    fi
     
-    # Boucle de navigation
+    # Afficher la liste
+    local index=1
+    for bug_id in "${bug_ids[@]}"; do
+        echo -e "  ${BOLD}${YELLOW}[$index]${NC} ${BOLD}${bug_id}${NC}"
+        ((index++))
+    done
+    
+    echo
+    echo -e "${INFO_ICON} ${CYAN}Correction sera marquée sur commit: ${BOLD}$(git rev-parse --short HEAD)${NC}"
+    echo
+    
+    # Demander la sélection
     while true; do
-        display_bug_list
+        read -p "Choisissez un numéro (1-${#bug_ids[@]}) ou 'q' pour quitter: " choice
         
-        # Lire une seule touche
-        read -rsn1 key
+        if [[ "$choice" == "q" || "$choice" == "Q" ]]; then
+            return 1
+        fi
         
-        case "$key" in
-            $'\x1b')  # Séquence d'échappement (flèches)
-                read -rsn1 -t 0.1 key2
-                if [[ "$key2" == "[" ]]; then
-                    read -rsn1 -t 0.1 key3
-                    case "$key3" in
-                        "A")  # Flèche haut
-                            ((selected > 0)) && ((selected--))
-                            ;;
-                        "B")  # Flèche bas
-                            ((selected < max_index)) && ((selected++))
-                            ;;
-                    esac
-                fi
-                ;;
-            "k"|"K")  # Vim-style: haut
-                ((selected > 0)) && ((selected--))
-                ;;
-            "j"|"J")  # Vim-style: bas
-                ((selected < max_index)) && ((selected++))
-                ;;
-            "")  # Entrée
-                echo "${bugs_array[$selected]}"
-                return 0
-                ;;
-            "q"|"Q")  # Quitter
-                return 1
-                ;;
-        esac
+        if [[ "$choice" =~ ^[0-9]+$ ]] && [[ $choice -ge 1 ]] && [[ $choice -le ${#bug_ids[@]} ]]; then
+            local selected_index=$((choice - 1))
+            echo "${bug_ids[$selected_index]}"
+            return 0
+        else
+            echo -e "${ERROR_ICON} ${RED}Choix invalide. Utilisez un numéro entre 1 et ${#bug_ids[@]}${NC}"
+        fi
     done
 }
 
