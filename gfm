@@ -254,60 +254,59 @@ select_bug_interactive() {
     echo -e "${CYAN}========================================${NC}"
     echo
     
-    # Récupérer les informations complètes des bugs
-    local bug_data=()
-    local temp_output=$(mktemp)
-    "$DETECTOR" list-bugs > "$temp_output"
+    # Méthode plus simple : extraire directement depuis la sortie
+    local bug_ids=()
+    local bug_commits=()
+    local bug_descriptions=()
     
-    # Parser les informations des bugs
-    local current_bug_id=""
+    # Capturer la sortie complète
+    local output=$("$DETECTOR" list-bugs 2>/dev/null)
+    
+    # Parser ligne par ligne avec une approche plus robuste
+    local current_bug=""
     local current_commit=""
-    local current_description=""
+    local current_desc=""
     
     while IFS= read -r line; do
-        # Nettoyer les codes ANSI pour le parsing
+        # Nettoyer les codes ANSI
         local clean_line=$(echo "$line" | sed 's/\x1b\[[0-9;]*m//g')
         
-        if [[ "$clean_line" =~ Bug\ ID:\ (BUG-[0-9]{8}-[A-F0-9]{4}) ]]; then
-            # Sauvegarder le bug précédent s'il existe
-            if [[ -n "$current_bug_id" && -n "$current_commit" && -n "$current_description" ]]; then
-                bug_data+=("$current_bug_id|$current_commit|$current_description")
+        if [[ "$clean_line" =~ ^Bug\ ID:\ (BUG-[0-9]{8}-[A-F0-9]{4}) ]]; then
+            # Nouveau bug trouvé - sauvegarder le précédent s'il existe
+            if [[ -n "$current_bug" && -n "$current_commit" && -n "$current_desc" ]]; then
+                bug_ids+=("$current_bug")
+                bug_commits+=("$current_commit")
+                bug_descriptions+=("$current_desc")
             fi
-            # Commencer un nouveau bug
-            current_bug_id="${BASH_REMATCH[1]}"
+            current_bug="${BASH_REMATCH[1]}"
             current_commit=""
-            current_description=""
-        elif [[ "$clean_line" =~ Commit:\ ([a-f0-9]{7}) ]]; then
+            current_desc=""
+        elif [[ "$clean_line" =~ ^Commit:\ ([a-f0-9]{7}) ]]; then
             current_commit="${BASH_REMATCH[1]}"
-        elif [[ "$clean_line" =~ Description:\ (.+) ]]; then
-            current_description="${BASH_REMATCH[1]}"
+        elif [[ "$clean_line" =~ ^Description:\ (.+)$ ]]; then
+            current_desc="${BASH_REMATCH[1]}"
         fi
-    done < "$temp_output"
+    done <<< "$output"
     
-    # Ajouter le dernier bug s'il existe
-    if [[ -n "$current_bug_id" && -n "$current_commit" && -n "$current_description" ]]; then
-        bug_data+=("$current_bug_id|$current_commit|$current_description")
+    # Ajouter le dernier bug
+    if [[ -n "$current_bug" && -n "$current_commit" && -n "$current_desc" ]]; then
+        bug_ids+=("$current_bug")
+        bug_commits+=("$current_commit")
+        bug_descriptions+=("$current_desc")
     fi
     
-    rm -f "$temp_output"
-    
-    if [[ ${#bug_data[@]} -eq 0 ]]; then
+    # Vérifier qu'on a des bugs
+    if [[ ${#bug_ids[@]} -eq 0 ]]; then
         echo -e "${INFO_ICON} ${YELLOW}Aucun bug à corriger trouvé${NC}"
         return 1
     fi
     
     # Afficher la liste avec descriptions
-    local index=1
-    local bug_ids=()
-    
-    for bug_info in "${bug_data[@]}"; do
-        IFS='|' read -r bug_id commit description <<< "$bug_info"
-        bug_ids+=("$bug_id")
-        
-        echo -e "  ${BOLD}${YELLOW}[$index]${NC} ${BOLD}${bug_id}${NC} ${CYAN}(${commit})${NC}"
-        echo -e "      ${description}"
+    for i in "${!bug_ids[@]}"; do
+        local index=$((i + 1))
+        echo -e "  ${BOLD}${YELLOW}[$index]${NC} ${BOLD}${bug_ids[$i]}${NC} ${CYAN}(${bug_commits[$i]})${NC}"
+        echo -e "      ${bug_descriptions[$i]}"
         echo
-        ((index++))
     done
     
     echo -e "${INFO_ICON} ${CYAN}Correction sera marquée sur commit: ${BOLD}$(git rev-parse --short HEAD)${NC}"
