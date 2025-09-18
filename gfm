@@ -115,16 +115,20 @@ detect_context() {
 find_bug_commit() {
     local bug_id="$1"
     local result=""
+    local one_year_ago=$(date -d "1 year ago" +%Y-%m-%d 2>/dev/null || date -v-1y +%Y-%m-%d 2>/dev/null || echo "2023-01-01")
     
     # Éviter le pipe pour éviter le sous-shell
     local notes_list=$(git notes --ref=refs/notes/bugs list 2>/dev/null)
     
     while read -r note_hash commit_hash; do
         if [[ -n "$commit_hash" ]]; then
-            local bug_info=$(git notes --ref=refs/notes/bugs show "$commit_hash" 2>/dev/null || echo "")
-            if [[ "$bug_info" == *"$bug_id"* ]]; then
-                echo "$commit_hash"
-                return 0
+            # Vérifier si le commit est récent (dernière année)
+            if git rev-list --since="$one_year_ago" --pretty=format: --abbrev-commit "$commit_hash" >/dev/null 2>&1; then
+                local bug_info=$(git notes --ref=refs/notes/bugs show "$commit_hash" 2>/dev/null || echo "")
+                if [[ "$bug_info" == *"$bug_id"* ]]; then
+                    echo "$commit_hash"
+                    return 0
+                fi
             fi
         fi
     done <<< "$notes_list"

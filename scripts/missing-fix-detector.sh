@@ -6,7 +6,34 @@
 BUG_NOTES_REF="bugs"
 FIX_NOTES_REF="fixes"
 
-# Couleurs pour l'affichage
+## Lister toutes les corrections marquées
+list_fixes() {
+    echo -e "${BLUE}🔧 Liste des corrections marquées:${NC}"
+    echo "=================================="
+    
+    local one_year_ago=$(date -d "1 year ago" +%Y-%m-%d 2>/dev/null || date -v-1y +%Y-%m-%d 2>/dev/null || echo "2023-01-01")
+    
+    # Utiliser git notes list directement pour les fixes, plus efficace
+    git notes --ref=$FIX_NOTES_REF list 2>/dev/null | while read note_obj commit; do
+        if [[ -n "$commit" ]]; then
+            # Vérifier si le commit est récent (dernière année)
+            if git rev-list --since="$one_year_ago" --pretty=format: --abbrev-commit "$commit" >/dev/null 2>&1; then
+                fix_info=$(git notes --ref=$FIX_NOTES_REF show "$commit" 2>/dev/null)
+                if [[ -n "$fix_info" ]]; then
+                    bug_id=$(echo "$fix_info" | cut -d: -f2)
+                    bug_commit=$(echo "$fix_info" | cut -d: -f4)
+                    commit_short=$(git rev-parse --short "$commit")
+                    bug_commit_short=$(git rev-parse --short "$bug_commit")
+                    
+                    echo -e "${GREEN}Fix ID:${NC} $bug_id"
+                    echo -e "${GREEN}Commit:${NC} $commit_short ($commit)"
+                    echo -e "${GREEN}Corrige:${NC} $bug_commit_short ($bug_commit)"
+                    echo ""
+                fi
+            fi
+        fi
+    done
+}ichage
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
@@ -49,9 +76,10 @@ find_cherry_pick_original() {
 # Trouver tous les commits cherry-pickés d'un commit original
 find_cherry_pick_copies() {
     local original_commit=$1
+    local one_year_ago=$(date -d "1 year ago" +%Y-%m-%d 2>/dev/null || date -v-1y +%Y-%m-%d 2>/dev/null || echo "2023-01-01")
     
-    # Chercher dans toutes les branches les commits qui référencent ce commit original
-    git log --all --grep="cherry picked from commit $original_commit" --format="%H" 2>/dev/null
+    # Chercher dans toutes les branches les commits qui référencent ce commit original (dernière année seulement)
+    git log --all --since="$one_year_ago" --grep="cherry picked from commit $original_commit" --format="%H" 2>/dev/null
 }
 
 # Propager automatiquement les notes vers les commits cherry-pickés
@@ -212,22 +240,26 @@ list_bugs() {
     echo -e "${BLUE}🐛 Liste des bugs à corriger:${NC}"
     echo "========================="
     
-    # Version ultra-simple et efficace
+    # Version ultra-simple et efficace limitée à la dernière année
     local found_any=false
+    local one_year_ago=$(date -d "1 year ago" +%Y-%m-%d 2>/dev/null || date -v-1y +%Y-%m-%d 2>/dev/null || echo "2023-01-01")
     
-    # Utiliser git notes list pour obtenir les commits qui ont des notes
+    # Utiliser git notes list pour obtenir les commits qui ont des notes, mais vérifier l'âge
     git notes --ref=$BUG_NOTES_REF list 2>/dev/null | while read note_obj commit; do
         if [[ -n "$commit" ]]; then
-            bug_info=$(git notes --ref=$BUG_NOTES_REF show "$commit" 2>/dev/null)
-            if [[ -n "$bug_info" ]]; then
-                bug_id=$(echo "$bug_info" | cut -d: -f2)
-                bug_desc=$(echo "$bug_info" | cut -d: -f3-)
-                commit_short=$(git rev-parse --short "$commit" 2>/dev/null)
-                
-                echo -e "${YELLOW}Bug ID:${NC} $bug_id"
-                echo -e "${YELLOW}Commit:${NC} $commit_short"
-                echo -e "${YELLOW}Description:${NC} $bug_desc"
-                echo ""
+            # Vérifier si le commit est récent (dernière année)
+            if git rev-list --since="$one_year_ago" --pretty=format: --abbrev-commit "$commit" >/dev/null 2>&1; then
+                bug_info=$(git notes --ref=$BUG_NOTES_REF show "$commit" 2>/dev/null)
+                if [[ -n "$bug_info" ]]; then
+                    bug_id=$(echo "$bug_info" | cut -d: -f2)
+                    bug_desc=$(echo "$bug_info" | cut -d: -f3-)
+                    commit_short=$(git rev-parse --short "$commit" 2>/dev/null)
+                    
+                    echo -e "${YELLOW}Bug ID:${NC} $bug_id"
+                    echo -e "${YELLOW}Commit:${NC} $commit_short"
+                    echo -e "${YELLOW}Description:${NC} $bug_desc"
+                    echo ""
+                fi
             fi
         fi
     done
@@ -244,18 +276,26 @@ list_fixes() {
     echo -e "${BLUE}🔧 Liste des corrections marquées:${NC}"
     echo "================================="
     
-    git rev-list --all | while read commit; do
-        if git notes --ref=$FIX_NOTES_REF show "$commit" >/dev/null 2>&1; then
-            fix_info=$(git notes --ref=$FIX_NOTES_REF show "$commit")
-            bug_id=$(echo "$fix_info" | cut -d: -f2)
-            bug_commit=$(echo "$fix_info" | cut -d: -f4)
-            commit_short=$(git rev-parse --short "$commit")
-            bug_commit_short=$(git rev-parse --short "$bug_commit")
-            
-            echo -e "${GREEN}Fix ID:${NC} $bug_id"
-            echo -e "${GREEN}Commit:${NC} $commit_short ($commit)"
-            echo -e "${GREEN}Corrige:${NC} $bug_commit_short ($bug_commit)"
-            echo ""
+    local one_year_ago=$(date -d "1 year ago" +%Y-%m-%d 2>/dev/null || date -v-1y +%Y-%m-%d 2>/dev/null || echo "2023-01-01")
+    
+    # Utiliser git notes list directement pour les fixes, plus efficace
+    git notes --ref=$FIX_NOTES_REF list 2>/dev/null | while read note_obj commit; do
+        if [[ -n "$commit" ]]; then
+            # Vérifier si le commit est récent (dernière année)
+            if git rev-list --since="$one_year_ago" --pretty=format: --abbrev-commit "$commit" >/dev/null 2>&1; then
+                fix_info=$(git notes --ref=$FIX_NOTES_REF show "$commit" 2>/dev/null)
+                if [[ -n "$fix_info" ]]; then
+                    bug_id=$(echo "$fix_info" | cut -d: -f2)
+                    bug_commit=$(echo "$fix_info" | cut -d: -f4)
+                    commit_short=$(git rev-parse --short "$commit")
+                    bug_commit_short=$(git rev-parse --short "$bug_commit")
+                    
+                    echo -e "${GREEN}Fix ID:${NC} $bug_id"
+                    echo -e "${GREEN}Commit:${NC} $commit_short ($commit)"
+                    echo -e "${GREEN}Corrige:${NC} $bug_commit_short ($bug_commit)"
+                    echo ""
+                fi
+            fi
         fi
     done
 }
@@ -276,12 +316,15 @@ detect_missing_fixes() {
         exit 1
     fi
     
-    echo -e "${BLUE}🔍 Analyse de $target_branch pour détecter les corrections manquantes...${NC}"
+    echo -e "${BLUE}🔍 Analyse de $target_branch pour détecter les corrections manquantes (dernière année)...${NC}"
     echo ""
+    
+    # Date limite - dernière année
+    local one_year_ago=$(date -d "1 year ago" +%Y-%m-%d 2>/dev/null || date -v-1y +%Y-%m-%d 2>/dev/null || echo "2023-01-01")
     
     # 0. D'abord, hériter automatiquement les notes des commits originaux vers les cherry-picks
     echo -e "${BLUE}🔄 Héritage automatique des notes depuis les commits originaux...${NC}"
-    local target_commits=$(git rev-list "$target_branch")
+    local target_commits=$(git rev-list --since="$one_year_ago" "$target_branch")
     for commit in $target_commits; do
         # Essayer d'hériter les notes de bugs
         propagate_from_original "$commit" "$BUG_NOTES_REF" >/dev/null 2>&1
@@ -294,7 +337,7 @@ detect_missing_fixes() {
     local temp_file="/tmp/missing_fixes_$$"
     rm -f "$temp_file"
     
-    # 1. Lister tous les commits de la branche cible
+    # 1. Lister tous les commits de la branche cible (dernière année seulement)
     for commit in $target_commits; do
         
         # 2. Vérifier si ce commit a une note de bug
@@ -308,7 +351,6 @@ detect_missing_fixes() {
             
             # 3. Chercher si une correction existe dans la branche cible
             local fix_in_target=false
-            local target_commits=$(git rev-list "$target_branch")
             
             # Obtenir tous les commits liés (original + cherry-picks) pour ce bug
             local related_commits=$(get_related_commits "$commit")
@@ -338,12 +380,12 @@ detect_missing_fixes() {
                 
                 local fix_found_elsewhere=false
                 
-                # Chercher le fix sur toutes les autres branches
+                # Chercher le fix sur toutes les autres branches (dernière année seulement)
                 while read -r other_branch; do
                     if [ -n "$other_branch" ]; then
-                        # Créer une liste des commits de cette branche
+                        # Créer une liste des commits de cette branche (dernière année)
                         local commits_to_check="/tmp/commits_$$"
-                        git rev-list "$other_branch" 2>/dev/null > "$commits_to_check"
+                        git rev-list --since="$one_year_ago" "$other_branch" 2>/dev/null > "$commits_to_check"
                         
                         # Vérifier chaque commit de cette branche
                         while read -r potential_fix; do
