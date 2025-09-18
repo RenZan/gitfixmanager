@@ -104,14 +104,21 @@ detect_context() {
 # Trouver automatiquement le commit d'un bug
 find_bug_commit() {
     local bug_id="$1"
+    local result=""
     
-    git notes --ref=refs/notes/bugs list 2>/dev/null | while read note_hash commit_hash; do
-        local bug_info=$(git notes --ref=refs/notes/bugs show $commit_hash 2>/dev/null || echo "")
-        if [[ "$bug_info" == *"$bug_id"* ]]; then
-            echo $commit_hash
-            return 0
+    # Éviter le pipe pour éviter le sous-shell
+    local notes_list=$(git notes --ref=refs/notes/bugs list 2>/dev/null)
+    
+    while read -r note_hash commit_hash; do
+        if [[ -n "$commit_hash" ]]; then
+            local bug_info=$(git notes --ref=refs/notes/bugs show "$commit_hash" 2>/dev/null || echo "")
+            if [[ "$bug_info" == *"$bug_id"* ]]; then
+                echo "$commit_hash"
+                return 0
+            fi
         fi
-    done
+    done <<< "$notes_list"
+    
     return 1
 }
 
@@ -262,20 +269,25 @@ select_bug_interactive() {
         local clean_line=$(echo "$line" | sed 's/\x1b\[[0-9;]*m//g')
         
         if [[ "$clean_line" =~ Bug\ ID:\ (BUG-[0-9]{8}-[A-F0-9]{4}) ]]; then
+            # Sauvegarder le bug précédent s'il existe
+            if [[ -n "$current_bug_id" && -n "$current_commit" && -n "$current_description" ]]; then
+                bug_data+=("$current_bug_id|$current_commit|$current_description")
+            fi
+            # Commencer un nouveau bug
             current_bug_id="${BASH_REMATCH[1]}"
+            current_commit=""
+            current_description=""
         elif [[ "$clean_line" =~ Commit:\ ([a-f0-9]{7}) ]]; then
             current_commit="${BASH_REMATCH[1]}"
         elif [[ "$clean_line" =~ Description:\ (.+) ]]; then
             current_description="${BASH_REMATCH[1]}"
-            # Une fois qu'on a les 3 infos, ajouter au tableau
-            if [[ -n "$current_bug_id" && -n "$current_commit" && -n "$current_description" ]]; then
-                bug_data+=("$current_bug_id|$current_commit|$current_description")
-                current_bug_id=""
-                current_commit=""
-                current_description=""
-            fi
         fi
     done < "$temp_output"
+    
+    # Ajouter le dernier bug s'il existe
+    if [[ -n "$current_bug_id" && -n "$current_commit" && -n "$current_description" ]]; then
+        bug_data+=("$current_bug_id|$current_commit|$current_description")
+    fi
     
     rm -f "$temp_output"
     
