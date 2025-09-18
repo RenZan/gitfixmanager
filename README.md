@@ -18,10 +18,17 @@ gfm check release/v1.0             # Vérification complète
 
 **C'est tout !** Trois commandes pour gérer tous vos bugs et corrections.
 
-## ⚡ Installation Rapide
+## ⚡ Installation Ultra-Rapide
+
+### 🚀 One-liner (Recommandé)
 
 ```bash
-# Clone et installation automatique
+curl -fsSL https://raw.githubusercontent.com/RenZan/gitfixmanager/main/install.sh | bash
+```
+
+### 📦 Installation Manuelle
+
+```bash
 git clone https://github.com/RenZan/gitfixmanager.git
 cd gitfixmanager
 ./install-smart.sh
@@ -52,6 +59,7 @@ gfm check release/v2.1.0
 
 ## 🚀 Fonctionnalités Principales
 
+- **⚡ Installation one-liner** : `curl | bash` et c'est prêt !
 - **🤖 Auto-génération d'ID** : Plus besoin de gérer les identifiants manuellement
 - **🎯 Auto-détection** : Reconnaît automatiquement commits, branches, descriptions  
 - **✅ Vérification simple** : `gfm check` pour valider avant push
