@@ -13,6 +13,24 @@ YELLOW='\033[0;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+# Vérifier l'identité Git avant de créer des notes
+check_git_identity() {
+    local git_name=$(git config user.name 2>/dev/null)
+    local git_email=$(git config user.email 2>/dev/null)
+    
+    if [ -z "$git_name" ] || [ -z "$git_email" ]; then
+        echo -e "${RED}❌ Identité Git non configurée${NC}"
+        echo -e "${YELLOW}💡 Configurez votre identité avec:${NC}"
+        echo -e "   ${BLUE}git config --global user.name \"Votre Nom\"${NC}"
+        echo -e "   ${BLUE}git config --global user.email \"votre.email@example.com\"${NC}"
+        echo -e "${YELLOW}💡 Ou pour ce repository uniquement (sans --global):${NC}"
+        echo -e "   ${BLUE}git config user.name \"Votre Nom\"${NC}"
+        echo -e "   ${BLUE}git config user.email \"votre.email@example.com\"${NC}"
+        return 1
+    fi
+    return 0
+}
+
 # Marquer un commit comme bug
 mark_bug() {
     local bug_commit=$1
@@ -24,6 +42,11 @@ mark_bug() {
         exit 1
     fi
     
+    # Vérifier l'identité Git avant de créer des notes
+    if ! check_git_identity; then
+        exit 1
+    fi
+    
     # Vérifier que le commit existe
     if ! git rev-parse --verify "$bug_commit" >/dev/null 2>&1; then
         echo -e "${RED}❌ Erreur: Le commit $bug_commit n'existe pas${NC}"
@@ -31,6 +54,10 @@ mark_bug() {
     fi
     
     git notes --ref=$BUG_NOTES_REF add -m "BUG:$bug_id:$description" "$bug_commit"
+    if [ $? -ne 0 ]; then
+        echo -e "${RED}❌ Erreur lors du marquage du bug${NC}"
+        exit 1
+    fi
     echo -e "${GREEN}✓ Bug $bug_id marqué sur commit $bug_commit${NC}"
     echo -e "  Description: $description"
 }
@@ -46,6 +73,11 @@ mark_fix() {
         exit 1
     fi
     
+    # Vérifier l'identité Git avant de créer des notes
+    if ! check_git_identity; then
+        exit 1
+    fi
+    
     # Vérifier que les commits existent
     if ! git rev-parse --verify "$fix_commit" >/dev/null 2>&1; then
         echo -e "${RED}❌ Erreur: Le commit de correction $fix_commit n'existe pas${NC}"
@@ -58,6 +90,10 @@ mark_fix() {
     fi
     
     git notes --ref=$FIX_NOTES_REF add -m "FIX:$bug_id:fixes-commit:$bug_commit" "$fix_commit"
+    if [ $? -ne 0 ]; then
+        echo -e "${RED}❌ Erreur lors du marquage de la correction${NC}"
+        exit 1
+    fi
     echo -e "${GREEN}✓ Correction $bug_id marquée sur commit $fix_commit (corrige $bug_commit)${NC}"
 }
 
