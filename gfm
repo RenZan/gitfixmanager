@@ -323,25 +323,25 @@ select_bug_interactive() {
         return 1
     fi
     
-    # Afficher la liste avec descriptions
+    # Afficher la liste avec descriptions AVANT la sélection
     for i in "${!bug_ids[@]}"; do
         local index=$((i + 1))
         echo -e "  ${BOLD}${YELLOW}[$index]${NC} ${BOLD}${bug_ids[$i]}${NC} ${CYAN}(${bug_commits[$i]})${NC}"
         echo -e "      ${bug_descriptions[$i]}"
         echo
     done
-    
+
     echo -e "${INFO_ICON} ${CYAN}Correction sera marquée sur commit: ${BOLD}$(git rev-parse --short HEAD)${NC}"
     echo
-    
+
     # Demander la sélection
     while true; do
         read -p "Choisissez un numéro (1-${#bug_ids[@]}) ou 'q' pour quitter: " choice
-        
+
         if [[ "$choice" == "q" || "$choice" == "Q" ]]; then
             return 1
         fi
-        
+
         if [[ "$choice" =~ ^[0-9]+$ ]] && [[ $choice -ge 1 ]] && [[ $choice -le ${#bug_ids[@]} ]]; then
             local selected_index=$((choice - 1))
             echo "${bug_ids[$selected_index]}"
