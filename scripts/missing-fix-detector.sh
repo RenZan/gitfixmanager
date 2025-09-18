@@ -379,30 +379,52 @@ detect_missing_fixes() {
                 fi
             done
             
-            # 4. Si pas de correction dans target, recherche rapide avec git notes seulement
+            # 4. Si pas de correction dans target, chercher sur master et version/* seulement
             if [ "$fix_in_target" = false ]; then
-                echo -e "  ${YELLOW}⚠️  Aucune correction dans $target_branch, recherche rapide dans les notes...${NC}"
+                echo -e "  ${YELLOW}⚠️  Aucune correction dans $target_branch, recherche sur master et version/*...${NC}"
                 
                 local fix_found_elsewhere=false
                 
-                # Méthode ultra-rapide: chercher directement dans toutes les notes de fixes
+                # Méthode optimisée: chercher dans les notes de fixes mais filtrer par branches cibles
                 git notes --ref=$FIX_NOTES_REF list 2>/dev/null | while read note_obj potential_fix; do
                     if [ -n "$potential_fix" ] && is_recent_commit "$potential_fix" "$one_year_ago"; then
-                        local fix_note=$(git notes --ref=$FIX_NOTES_REF show "$potential_fix" 2>/dev/null)
-                        if [ -n "$fix_note" ]; then
-                            for related_commit in $related_commits; do
-                                if echo "$fix_note" | grep -q "FIX:$bug_id:fixes-commit:$related_commit"; then
-                                    fix_short=$(get_short_hash "$potential_fix")
-                                    related_short=$(get_short_hash "$related_commit")
-                                    echo -e "  ${RED}🚨 CORRECTION TROUVÉE: commit $fix_short${NC}"
-                                    echo -e "     ${RED}➜ Corrige commit lié $related_short (bug $bug_id présent dans $target_branch)${NC}"
-                                    
-                                    # Enregistrer pour le rapport final
-                                    echo "$bug_id|$commit|$potential_fix|autres|$bug_desc" >> "$temp_file"
-                                    fix_found_elsewhere=true
-                                    break 2  # Sortir des deux boucles
+                        # Vérifier si ce fix est présent sur master ou version/*
+                        local found_on_target_branches=false
+                        
+                        # Vérifier master
+                        if git merge-base --is-ancestor "$potential_fix" "master" 2>/dev/null || \
+                           git merge-base --is-ancestor "$potential_fix" "origin/master" 2>/dev/null; then
+                            found_on_target_branches=true
+                        fi
+                        
+                        # Vérifier version/* branches si pas encore trouvé
+                        if [ "$found_on_target_branches" = false ]; then
+                            git for-each-ref --format='%(refname:short)' refs/heads/version/ refs/remotes/origin/version/ 2>/dev/null | while read version_branch; do
+                                if git merge-base --is-ancestor "$potential_fix" "$version_branch" 2>/dev/null; then
+                                    found_on_target_branches=true
+                                    break
                                 fi
                             done
+                        fi
+                        
+                        # Si le fix est sur une branche cible, vérifier s'il corrige notre bug
+                        if [ "$found_on_target_branches" = true ]; then
+                            local fix_note=$(git notes --ref=$FIX_NOTES_REF show "$potential_fix" 2>/dev/null)
+                            if [ -n "$fix_note" ]; then
+                                for related_commit in $related_commits; do
+                                    if echo "$fix_note" | grep -q "FIX:$bug_id:fixes-commit:$related_commit"; then
+                                        fix_short=$(get_short_hash "$potential_fix")
+                                        related_short=$(get_short_hash "$related_commit")
+                                        echo -e "  ${RED}🚨 CORRECTION TROUVÉE sur master/version/*: commit $fix_short${NC}"
+                                        echo -e "     ${RED}➜ Corrige commit lié $related_short (bug $bug_id présent dans $target_branch)${NC}"
+                                        
+                                        # Enregistrer pour le rapport final
+                                        echo "$bug_id|$commit|$potential_fix|master/version|$bug_desc" >> "$temp_file"
+                                        fix_found_elsewhere=true
+                                        break 2  # Sortir des deux boucles
+                                    fi
+                                done
+                            fi
                         fi
                     fi
                 done
