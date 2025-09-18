@@ -197,26 +197,43 @@ detect_missing_fixes() {
             if [ "$fix_in_target" = false ]; then
                 echo -e "  ${YELLOW}⚠️  Aucune correction dans $target_branch, recherche sur les autres branches...${NC}"
                 
-                # Chercher le fix sur toutes les autres branches
-                local fix_found_elsewhere=""
+                # Créer une liste des branches à vérifier
+                local branches_to_check="/tmp/branches_$$"
+                git for-each-ref --format='%(refname:short)' refs/heads/ refs/remotes/ | grep -v "^$target_branch$" | grep -v "^origin/$target_branch$" > "$branches_to_check"
                 
-                git for-each-ref --format='%(refname:short)' refs/heads/ refs/remotes/ | while read other_branch; do
-                    # Ignorer la branche cible
-                    if [ "$other_branch" != "$target_branch" ] && [ "$other_branch" != "origin/$target_branch" ]; then
+                local fix_found_elsewhere=false
+                
+                # Chercher le fix sur toutes les autres branches
+                while read -r other_branch; do
+                    if [ -n "$other_branch" ]; then
+                        # Créer une liste des commits de cette branche
+                        local commits_to_check="/tmp/commits_$$"
+                        git rev-list "$other_branch" 2>/dev/null > "$commits_to_check"
                         
-                        git rev-list "$other_branch" 2>/dev/null | while read potential_fix; do
-                            if git notes --ref=$FIX_NOTES_REF show "$potential_fix" 2>/dev/null | grep -q "FIX:$bug_id:fixes-commit:$commit"; then
-                                fix_short=$(git rev-parse --short "$potential_fix")
-                                echo -e "  ${RED}🚨 CORRECTION TROUVÉE sur $other_branch: commit $fix_short${NC}"
-                                echo -e "     ${RED}➜ Bug $bug_id présent dans $target_branch mais corrigé ailleurs!${NC}"
-                                
-                                # Enregistrer pour le rapport final
-                                echo "$bug_id|$commit|$potential_fix|$other_branch|$bug_desc" >> "$temp_file"
-                                break
+                        # Vérifier chaque commit de cette branche
+                        while read -r potential_fix; do
+                            if [ -n "$potential_fix" ]; then
+                                if git notes --ref=$FIX_NOTES_REF show "$potential_fix" 2>/dev/null | grep -q "FIX:$bug_id:fixes-commit:$commit"; then
+                                    fix_short=$(git rev-parse --short "$potential_fix")
+                                    echo -e "  ${RED}🚨 CORRECTION TROUVÉE sur $other_branch: commit $fix_short${NC}"
+                                    echo -e "     ${RED}➜ Bug $bug_id présent dans $target_branch mais corrigé ailleurs!${NC}"
+                                    
+                                    # Enregistrer pour le rapport final
+                                    echo "$bug_id|$commit|$potential_fix|$other_branch|$bug_desc" >> "$temp_file"
+                                    fix_found_elsewhere=true
+                                    break
+                                fi
                             fi
-                        done
+                        done < "$commits_to_check"
+                        rm -f "$commits_to_check"
+                        
+                        # Si trouvé, on peut arrêter de chercher
+                        if [ "$fix_found_elsewhere" = true ]; then
+                            break
+                        fi
                     fi
-                done
+                done < "$branches_to_check"
+                rm -f "$branches_to_check"
             fi
         fi
     done

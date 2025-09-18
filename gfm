@@ -101,8 +101,8 @@ detect_context() {
 find_bug_commit() {
     local bug_id="$1"
     
-    git notes --ref=refs/notes/bugs list 2>/dev/null | while read commit_hash note_hash; do
-        local bug_info=$(git notes --ref=refs/notes/bugs show $note_hash 2>/dev/null || echo "")
+    git notes --ref=refs/notes/bugs list 2>/dev/null | while read note_hash commit_hash; do
+        local bug_info=$(git notes --ref=refs/notes/bugs show $commit_hash 2>/dev/null || echo "")
         if [[ "$bug_info" == *"$bug_id"* ]]; then
             echo $commit_hash
             return 0
