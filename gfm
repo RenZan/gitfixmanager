@@ -48,6 +48,22 @@ WARNING_ICON="⚠️"
 ERROR_ICON="❌"
 INFO_ICON="💡"
 ROCKET_ICON="🚀"
+
+# Fonction pour obtenir le nom de la branche courante
+get_current_branch_name() {
+    local branch=$(git branch --show-current 2>/dev/null)
+    if [ -n "$branch" ]; then
+        echo "$branch"
+    else
+        # Fallback pour les cas où on est en état detached HEAD
+        local describe=$(git describe --all --exact-match HEAD 2>/dev/null | sed 's|^heads/||')
+        if [ -n "$describe" ]; then
+            echo "$describe"
+        else
+            echo "HEAD"
+        fi
+    fi
+}
 LIST_ICON="📝"
 STATUS_ICON="📊"
 
@@ -162,7 +178,7 @@ interactive_mode() {
             if [[ -n "$description" ]]; then
                 echo
                 echo "Sur quel commit marquer ce bug ?"
-                echo "  1) Commit actuel (HEAD)"
+                echo "  1) Commit actuel ($(get_current_branch_name))"
                 echo "  2) Autre commit (hash, branche, tag)"
                 read -p "Choix (1-2, défaut=1): " commit_choice
                 
@@ -234,7 +250,7 @@ mark_bug_interactive() {
         echo -e "${INFO_ICON} ${CYAN}Marquage sur commit spécifié${NC}"
     else
         commit=$(git rev-parse HEAD)
-        echo -e "${INFO_ICON} ${CYAN}Marquage sur commit actuel (HEAD)${NC}"
+        echo -e "${INFO_ICON} ${CYAN}Marquage sur commit actuel ($(get_current_branch_name))${NC}"
     fi
     
     echo
@@ -348,7 +364,7 @@ select_fix_commit_interactive() {
     done
     
     echo
-    echo -e "  ${BOLD}${YELLOW}[H]${NC} ${BOLD}HEAD${NC} (commit actuel)"
+    echo -e "  ${BOLD}${YELLOW}[H]${NC} ${BOLD}$(get_current_branch_name)${NC} (commit actuel)"
     echo -e "  ${BOLD}${YELLOW}[C]${NC} Saisir un commit spécifique"
     echo
     
@@ -362,7 +378,7 @@ select_fix_commit_interactive() {
         
         if [[ "$choice" == "h" || "$choice" == "H" ]]; then
             SELECTED_FIX_COMMIT=$(git rev-parse HEAD)
-            echo -e "${INFO_ICON} ${GREEN}Commit sélectionné: $(git rev-parse --short HEAD) (HEAD)${NC}"
+            echo -e "${INFO_ICON} ${GREEN}Commit sélectionné: $(git rev-parse --short HEAD) ($(get_current_branch_name))${NC}"
             return 0
         fi
         
@@ -542,7 +558,7 @@ show_help() {
             echo "  gfm b \"description\"                   # raccourci"
             echo
             echo "Exemples :"
-            echo "  gfm bug \"Memory leak in parser\"        # Marque sur HEAD"
+            echo "  gfm bug \"Memory leak in parser\"        # Marque sur branche courante"
             echo "  gfm bug \"Bug in auth\" abc1234         # Marque sur commit abc1234"
             echo "  gfm bug \"Error handling\" main~3       # Marque sur 3 commits avant main"
             echo "  gfm bug \"Performance issue\" v1.0.0    # Marque sur tag v1.0.0"
@@ -673,7 +689,7 @@ main() {
                 echo -e "${ERROR_ICON} ${RED}Description du bug requise${NC}"
                 echo -e "${INFO_ICON} ${CYAN}Usage: gfm bug \"description\" [commit]${NC}"
                 echo -e "${INFO_ICON} ${CYAN}Exemples:${NC}"
-                echo -e "${INFO_ICON} ${CYAN}  gfm bug \"Memory leak\"           # Sur HEAD${NC}"
+                echo -e "${INFO_ICON} ${CYAN}  gfm bug \"Memory leak\"           # Sur branche courante${NC}"
                 echo -e "${INFO_ICON} ${CYAN}  gfm bug \"Bug xyz\" abc1234      # Sur commit abc1234${NC}"
                 exit 1
             fi
