@@ -307,9 +307,8 @@ detect_missing_fixes() {
     local bug_commits=$(git notes --ref=$BUG_NOTES_REF list 2>/dev/null | cut -d' ' -f2)
     local fix_commits=$(git notes --ref=$FIX_NOTES_REF list 2>/dev/null | cut -d' ' -f2)
     
-    # Étape 2: Créer une liste des commits de la branche cible (une seule fois)
-    local target_commits_set="/tmp/target_commits_$$"
-    git rev-list "$target_branch" > "$target_commits_set"
+    # Étape 2: Optimisation ultime - utiliser git branch --contains pour vérifications rapides
+    # au lieu de créer un fichier temporaire
     
     for commit in $bug_commits; do
         # Essayer d'hériter les notes de bugs
@@ -326,7 +325,7 @@ detect_missing_fixes() {
     # OPTIMISATION RÉVOLUTIONNAIRE: analyser seulement les bugs présents dans target_branch
     for commit in $bug_commits; do
         # Vérifier rapidement si ce commit de bug est dans la branche cible
-        if ! grep -q "^$commit$" "$target_commits_set" 2>/dev/null; then
+        if ! git merge-base --is-ancestor "$commit" "$target_branch" 2>/dev/null; then
             continue  # Skip si pas dans cette branche
         fi
         
@@ -345,10 +344,10 @@ detect_missing_fixes() {
             # Obtenir tous les commits liés (original + cherry-picks) pour ce bug
             local related_commits=$(get_related_commits "$commit")
             
-            # SUPER OPTIMISATION: vérifier directement dans les fixes de target_branch via grep
+            # SUPER OPTIMISATION: vérifier directement si fix est dans target_branch
             for potential_fix in $fix_commits; do
-                # Vérification ultra-rapide: ce fix est-il dans target_branch ?
-                if grep -q "^$potential_fix$" "$target_commits_set" 2>/dev/null; then
+                # Vérification rapide: ce fix est-il dans target_branch ?
+                if git merge-base --is-ancestor "$potential_fix" "$target_branch" 2>/dev/null; then
                     # Vérifier si cette correction référence n'importe lequel des commits liés
                     local fix_note=$(git notes --ref=$FIX_NOTES_REF show "$potential_fix" 2>/dev/null)
                     if [ -n "$fix_note" ]; then
@@ -464,7 +463,7 @@ detect_missing_fixes() {
     fi
     
     # Nettoyage des fichiers temporaires
-    rm -f "$temp_file" "$target_commits_set"
+    rm -f "$temp_file"
 }
 
 # Suggérer les commandes de correction
