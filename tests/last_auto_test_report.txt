@@ -1,0 +1,21 @@
+TEST AUTOMATISÉ - RAPPORT
+========================
+Date: Fri Sep 19 19:51:12 CEST 2025
+Environnement: tests/test-auto-ci.sh
+Commit GFM: 4c53b8d
+
+RÉSULTATS:
+- Bugs détectés: 3
+- Alertes limitation: 00  
+- Performance: 0s
+- Status: PASS
+
+TESTS:
+- ✅ Création environnement
+- ✅ Marquage bugs
+- ✅ Statut sans timeout
+- ✅ Nombre bugs raisonnable
+- ⚠️ Alertes actives
+- ✅ Performance
+- ✅ Régression
+
