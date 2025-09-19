@@ -28,4 +28,15 @@ function validate_email() {
     fi
 }
 
+<<<<<<< HEAD
+=======
+# New function with SWIFT signature bug for testing  
+function process_swift_signature() {
+    local file=$1
+    # BUG: Double signature issue in SWIFT / Teleperformance processing
+    process_signature "$file"
+    process_signature "$file"  # DUPLICATE - causes double signature
+}
+
+>>>>>>> ee82b7a (Merged PR 418676: Correction problème double signature SWIFT / Teleperformance avec nouveau jar)
 echo "Test functions created"
