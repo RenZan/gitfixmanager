@@ -1,13 +1,13 @@
 #!/bin/bash
 
 # Git Fix Manager (gfm) - Interface simplifiée et intelligente
-# Version 2.0 - Interface utilisateur modernisée
+# Version 1.0 - Outil professionnel de gestion des corrections
 # https://github.com/RenZan/gitfixmanager
 
 set -e
 
 # Configuration
-VERSION="2.0.0"
+VERSION="1.0.0"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DETECTOR="$SCRIPT_DIR/scripts/missing-fix-detector.sh"
 

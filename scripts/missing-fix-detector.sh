@@ -6,10 +6,10 @@
 BUG_NOTES_REF="bugs"
 FIX_NOTES_REF="fixes"
 
-# Cache pour optimiser les appels répétitifs
+# Cache pour les hash courts
 declare -A SHORT_HASH_CACHE
 
-# Fonction optimisée pour obtenir les hash courts
+# Fonction pour obtenir les hash courts
 get_short_hash() {
     local commit=$1
     if [[ -z "${SHORT_HASH_CACHE[$commit]}" ]]; then
@@ -219,7 +219,7 @@ mark_fix() {
     propagate_to_cherry_picks "$fix_commit" "$FIX_NOTES_REF" "FIX:$bug_id:fixes-commit:$bug_commit"
 }
 
-# Lister tous les bugs marqués (version ultra-rapide)
+# Lister tous les bugs marqués
 list_bugs() {
     echo -e "${BLUE}🐛 Liste des bugs à corriger (toutes branches):${NC}"
     echo "========================="
@@ -256,7 +256,7 @@ list_fixes() {
     echo -e "${BLUE}🔧 Liste des corrections marquées (toutes branches):${NC}"
     echo "================================="
     
-    # Utiliser git notes list directement pour les fixes - BEAUCOUP plus rapide que git log/rev-list
+    # Utiliser git notes list pour les fixes
     git notes --ref=$FIX_NOTES_REF list 2>/dev/null | while read note_obj commit; do
         if [[ -n "$commit" ]]; then
             fix_info=$(git notes --ref=$FIX_NOTES_REF show "$commit" 2>/dev/null)
@@ -317,17 +317,17 @@ detect_missing_fixes() {
         exit 1
     fi
     
-    echo -e "${BLUE}🔍 Analyse de $target_branch pour détecter les corrections manquantes (mode ultra-rapide)...${NC}"
+    echo -e "${BLUE}🔍 Analyse de $target_branch pour détecter les corrections manquantes...${NC}"
     echo ""
     
-    # OPTIMISATION MAJEURE: analyse basée exclusivement sur git notes list
+    # Analyse basée sur git notes list
     echo -e "${BLUE}🔄 Héritage automatique des notes depuis les commits originaux...${NC}"
     
     # Étape 1: Récupérer tous les commits avec bugs et fixes en une seule fois
     local bug_commits=$(git notes --ref=$BUG_NOTES_REF list 2>/dev/null | cut -d' ' -f2)
     local fix_commits=$(git notes --ref=$FIX_NOTES_REF list 2>/dev/null | cut -d' ' -f2)
     
-    # Étape 2: Optimisation ultime - utiliser git branch --contains pour vérifications rapides
+    # Étape 2: Vérification avec git branch --contains
     # au lieu de créer un fichier temporaire
     
     for commit in $bug_commits; do
@@ -342,9 +342,9 @@ detect_missing_fixes() {
     local temp_file="/tmp/missing_fixes_$$"
     rm -f "$temp_file"
     
-    # OPTIMISATION RÉVOLUTIONNAIRE: analyser seulement les bugs présents dans target_branch
+    # Analyser seulement les bugs présents dans target_branch
     for commit in $bug_commits; do
-        # Vérifier rapidement si ce commit de bug est dans la branche cible
+        # Vérifier si ce commit de bug est dans la branche cible
         if ! git merge-base --is-ancestor "$commit" "$target_branch" 2>/dev/null; then
             continue  # Skip si pas dans cette branche
         fi
@@ -358,15 +358,15 @@ detect_missing_fixes() {
             
             echo -e "${YELLOW}🐛 Bug détecté: $bug_id dans commit $commit_short ($bug_desc)${NC}"
             
-            # 3. Chercher si une correction existe dans la branche cible (ultra-optimisé)
+            # 3. Chercher si une correction existe dans la branche cible
             local fix_in_target=false
             
             # Obtenir tous les commits liés (original + cherry-picks) pour ce bug
             local related_commits=$(get_related_commits "$commit")
             
-            # SUPER OPTIMISATION: vérifier directement si fix est dans target_branch
+            # Vérifier directement si fix est dans target_branch
             for potential_fix in $fix_commits; do
-                # Vérification rapide: ce fix est-il dans target_branch ?
+                # Vérification: ce fix est-il dans target_branch ?
                 if git merge-base --is-ancestor "$potential_fix" "$target_branch" 2>/dev/null; then
                     # Vérifier si cette correction référence n'importe lequel des commits liés
                     local fix_note=$(git notes --ref=$FIX_NOTES_REF show "$potential_fix" 2>/dev/null)
@@ -401,13 +401,13 @@ detect_missing_fixes() {
                 fi
             done
             
-            # 4. Si pas de correction dans target, chercher via git notes list optimisé
+            # 4. Si pas de correction dans target, chercher via git notes list
             if [ "$fix_in_target" = false ]; then
                 echo -e "  ${YELLOW}⚠️  Aucune correction dans $target_branch, recherche via git notes list...${NC}"
                 
                 local fix_found_elsewhere=false
                 
-                # OPTIMISATION MAJEURE: analyser directement tous les commits avec corrections
+                # Analyser directement tous les commits avec corrections
                 # via git notes list, puis vérifier s'ils corrigent notre bug ET ne sont pas dans target_branch
                 for potential_fix in $fix_commits; do
                     # Vérifier si cette correction référence notre bug

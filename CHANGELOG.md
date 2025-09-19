@@ -2,31 +2,30 @@
 
 Toutes les modifications notables de ce projet seront documentées dans ce fichier.
 
-## [2.0.0] - 2025-09-18
+## [1.0.0] - 2025-09-19
 
-### 🎉 Version Majeure - Interface Révolutionnée
+### 🎉 Version Initiale - Git Fix Manager
 
-#### ✨ Fonctionnalités Ajoutées
-- **Interface ultra-simplifiée** : Commandes `gfm` intuitives
+#### ✨ Fonctionnalités Principales
+- **Interface simplifiée** : Commandes `gfm` intuitives
 - **Auto-génération d'ID** : Plus de gestion manuelle des identifiants
 - **Auto-détection intelligente** : Reconnaît commits, branches, descriptions
 - **Mode interactif** : Interface guidée pour débutants
 - **Marquage sur commits spécifiques** : Support de n'importe quel commit
 - **Aide contextuelle** : `gfm help [commande]` avec exemples
-- **Installation intelligente** : `install-smart.sh` automatisé
+- **Installation automatisée** : `install-smart.sh` one-liner
 - **Protection automatique** : Hooks Git configurés automatiquement
 
-#### 🔄 Améliorations
-- **Réduction de complexité** : 8 commandes longues → 5 commandes courtes
-- **Temps d'apprentissage** : 30 minutes → 5 minutes
-- **Productivité** : +400% sur marquage de bugs
-- **UX moderne** : Icônes émojis, couleurs, messages informatifs
-- **Raccourcis** : `gfm b`, `gfm f`, `gfm c`, etc.
+#### � Caractéristiques
+- **Interface moderne** : Icônes émojis, couleurs, messages informatifs
+- **Raccourcis pratiques** : `gfm b`, `gfm f`, `gfm c`, etc.
+- **Performance optimisée** : Traitement efficace des grandes bases de code
+- **Multi-plateforme** : Linux, macOS, Windows (WSL)
 
-#### 🐛 Corrections
-- **Compatibilité WSL** : Tests et validation Windows
+#### ✅ Fonctionnalités
+- **Compatibilité WSL** : Support complet Windows
 - **Gestion d'erreurs** : Messages clairs et informatifs
-- **Robustesse** : Vérifications préliminaires renforcées
+- **Robustesse** : Vérifications préliminaires complètes
 
 #### 📖 Documentation
 - **README transformé** : Exemples ultra-simples

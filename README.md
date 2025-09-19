@@ -1,14 +1,14 @@
 # 🚀 Git Fix Manager
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](https://github.com/RenZan/gitfixmanager/releases)
+[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/RenZan/gitfixmanager/releases)
 [![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20WSL-lightgrey.svg)](https://github.com/RenZan/gitfixmanager)
 
-**Interface ultra-simplifiée pour détecter et suivre les corrections manquantes dans vos projets Git.**
+**Outil professionnel pour détecter et suivre les corrections manquantes dans vos projets Git.**
 
 Évitez les oublis de backport et assurez-vous que tous vos bugs ont leurs corrections dans les bonnes branches !
 
-## ✨ Interface Ultra-Simple
+## ✨ Interface Simple
 
 ```bash
 gfm bug "Memory leak"              # Auto-génère ID, détecte commit
@@ -18,7 +18,7 @@ gfm check release/v1.0             # Vérification complète
 
 **C'est tout !** Trois commandes pour gérer tous vos bugs et corrections.
 
-## ⚡ Installation Ultra-Rapide
+## ⚡ Installation Rapide
 
 ### 🚀 One-liner (Recommandé)
 
@@ -64,7 +64,7 @@ gfm check release/v2.1.0
 - **🎯 Auto-détection** : Reconnaît automatiquement commits, branches, descriptions  
 - **✅ Vérification simple** : `gfm check` pour valider avant push
 - **💬 Interface intuitive** : Mode interactif pour débutants
-- **⚡ Ultra-rapide** : 5 secondes pour marquer un bug vs 30 secondes avant
+- **⚡ Performance optimisée** : Traitement efficace des grandes bases de code
 - **🌍 Multi-plateforme** : Linux, macOS, Windows (WSL)
 
 ## 🎯 Marquage sur N'importe Quel Commit
