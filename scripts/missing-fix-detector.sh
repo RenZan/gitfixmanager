@@ -87,23 +87,26 @@ find_cherry_pick_copies() {
     # Méthode 2: Chercher par titre de commit similaire (pour les PR cherry-picks)
     local original_title=$(git show --format="%s" -s "$original_commit" 2>/dev/null)
     if [ -n "$original_title" ]; then
-        # Extraire les mots-clés principaux du titre (pour éviter les faux positifs)
-        local key_words=$(echo "$original_title" | grep -o "[A-Za-z]\{4,\}" | head -5 | tr '\n' ' ')
-        
-        if [ -n "$key_words" ]; then
-            # Chercher les commits contenant ces mots-clés
-            for word in $key_words; do
-                local matching_commits=$(git log --all --grep="$word" --format="%H" 2>/dev/null)
-                for commit in $matching_commits; do
-                    if [ "$commit" != "$original_commit" ]; then
-                        # Vérifier si c'est vraiment un cherry-pick en cherchant des indices
-                        local commit_msg=$(git show --format='%B' -s "$commit" 2>/dev/null)
-                        if echo "$commit_msg" | grep -qi "cherry\|pick\|merge.*pr"; then
-                            results="$results $commit"
+        # Seulement si le titre est assez spécifique (plus de 20 caractères et non générique)
+        if [ ${#original_title} -gt 20 ] && ! echo "$original_title" | grep -qi "^merge\|^update\|^fix\|^add\|^remove"; then
+            # Extraire des mots-clés spécifiques et longs (minimum 6 caractères)
+            local key_words=$(echo "$original_title" | grep -o "[A-Za-z]\{6,\}" | head -3 | tr '\n' ' ')
+            
+            if [ -n "$key_words" ]; then
+                # Chercher les commits contenant ces mots-clés spécifiques
+                for word in $key_words; do
+                    local matching_commits=$(git log --all --grep="$word" --format="%H" 2>/dev/null)
+                    for commit in $matching_commits; do
+                        if [ "$commit" != "$original_commit" ]; then
+                            # Vérification très stricte : doit explicitement mentionner cherry-pick
+                            local commit_msg=$(git show --format='%B' -s "$commit" 2>/dev/null)
+                            if echo "$commit_msg" | grep -qi "cherry.*pick\|picked.*from"; then
+                                results="$results $commit"
+                            fi
                         fi
-                    fi
+                    done
                 done
-            done
+            fi
         fi
     fi
     
