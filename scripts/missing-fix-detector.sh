@@ -55,6 +55,23 @@ find_cherry_pick_original() {
         echo "$original_commit"
         return 0
     fi
+    
+    # Chercher des patterns alternatifs (Pull Request, etc.)
+    # Format: "Cherry picked from !PR_NUMBER" ou "cherry picked from !PR_NUMBER"
+    local pr_number=$(echo "$commit_msg" | grep -i "cherry picked from !" | grep -o "![0-9]\+" | sed 's/!//')
+    
+    if [ -n "$pr_number" ]; then
+        # Essayer de trouver le commit original par le message de commit et la description
+        local commit_title=$(echo "$commit_msg" | head -1)
+        # Chercher dans toutes les branches des commits avec un titre similaire
+        local potential_original=$(git log --all --oneline --grep="$pr_number" --format="%H" | head -1)
+        
+        if [ -n "$potential_original" ] && [ "$potential_original" != "$commit" ]; then
+            echo "$potential_original"
+            return 0
+        fi
+    fi
+    
     return 1
 }
 
@@ -62,8 +79,33 @@ find_cherry_pick_original() {
 find_cherry_pick_copies() {
     local original_commit=$1
     
-    # Chercher dans toutes les branches les commits qui référencent ce commit original
-    git log --all --grep="cherry picked from commit $original_commit" --format="%H" 2>/dev/null
+    # Méthode 1: Chercher par référence directe au commit
+    local direct_refs=$(git log --all --grep="cherry picked from commit $original_commit" --format="%H" 2>/dev/null)
+    
+    # Méthode 2: Chercher par message de commit similaire (pour les PR cherry-picks)
+    local original_title=$(git show --format="%s" -s "$original_commit" 2>/dev/null | head -1)
+    local similar_commits=""
+    
+    if [ -n "$original_title" ]; then
+        # Chercher des commits avec le même titre mais différents hash
+        similar_commits=$(git log --all --oneline --grep="$(echo "$original_title" | sed 's/[.*]/\\&/g')" --format="%H" 2>/dev/null | grep -v "^$original_commit$")
+        
+        # Filtrer pour ne garder que ceux qui ressemblent vraiment à des cherry-picks
+        if [ -n "$similar_commits" ]; then
+            local filtered_similar=""
+            for commit in $similar_commits; do
+                local commit_msg=$(git show --format='%B' -s "$commit" 2>/dev/null)
+                # Vérifier si le message contient des indices de cherry-pick
+                if echo "$commit_msg" | grep -qi "cherry\|pick\|pr\|pull request\|merge"; then
+                    filtered_similar="$filtered_similar $commit"
+                fi
+            done
+            similar_commits="$filtered_similar"
+        fi
+    fi
+    
+    # Combiner les résultats et dédupliquer
+    echo "$direct_refs $similar_commits" | tr ' ' '\n' | grep -v "^$" | sort -u | tr '\n' ' '
 }
 
 # Propager automatiquement les notes vers les commits cherry-pickés
@@ -117,6 +159,55 @@ get_related_commits() {
     
     # Retourner la liste unique
     echo "$related_commits" | tr ' ' '\n' | sort -u | tr '\n' ' '
+}
+
+# Scanner tous les commits pour détecter les cherry-picks non hérités
+scan_and_inherit_cherry_picks() {
+    local ref_type=$1  # "bugs" ou "fixes"
+    local branch_filter=${2:-"--all"}  # Par défaut toutes les branches
+    
+    echo -e "${BLUE}🔄 Scan automatique des cherry-picks pour héritage...${NC}"
+    
+    # Obtenir tous les commits avec des notes
+    local commits_with_notes=$(git notes --ref="$ref_type" list 2>/dev/null | cut -d' ' -f2)
+    
+    if [ -z "$commits_with_notes" ]; then
+        return 0
+    fi
+    
+    local inherited_count=0
+    
+    # Pour chaque commit avec une note, chercher ses cherry-picks
+    for commit_with_note in $commits_with_notes; do
+        local note_content=$(git notes --ref="$ref_type" show "$commit_with_note" 2>/dev/null)
+        
+        if [ -n "$note_content" ]; then
+            # Chercher tous les cherry-picks de ce commit
+            local cherry_picks=$(find_cherry_pick_copies "$commit_with_note")
+            
+            # Propager la note vers tous les cherry-picks trouvés
+            if [ -n "$cherry_picks" ]; then
+                echo "$cherry_picks" | while read cherry_commit; do
+                    if [ -n "$cherry_commit" ] && [ "$cherry_commit" != "$commit_with_note" ]; then
+                        # Vérifier si une note n'existe pas déjà
+                        if ! git notes --ref="$ref_type" show "$cherry_commit" >/dev/null 2>&1; then
+                            git notes --ref="$ref_type" add -m "$note_content" "$cherry_commit" 2>/dev/null
+                            if [ $? -eq 0 ]; then
+                                local short_cherry=$(git rev-parse --short "$cherry_commit" 2>/dev/null || echo "N/A")
+                                local short_original=$(git rev-parse --short "$commit_with_note" 2>/dev/null || echo "N/A")
+                                echo -e "${GREEN}  ✓ Note héritée: $short_original → $short_cherry${NC}"
+                                inherited_count=$((inherited_count + 1))
+                            fi
+                        fi
+                    fi
+                done
+            fi
+        fi
+    done
+    
+    if [ $inherited_count -gt 0 ]; then
+        echo -e "${GREEN}📝 $inherited_count note(s) héritée(s) automatiquement${NC}"
+    fi
 }
 
 # Propager automatiquement les notes depuis les commits originaux
@@ -322,6 +413,10 @@ detect_missing_fixes() {
     
     # Analyse basée sur git notes list
     echo -e "${BLUE}🔄 Héritage automatique des notes depuis les commits originaux...${NC}"
+    
+    # NOUVEAU: Scanner activement pour hériter les notes des cherry-picks
+    scan_and_inherit_cherry_picks "$BUG_NOTES_REF" "$target_branch"
+    scan_and_inherit_cherry_picks "$FIX_NOTES_REF" "$target_branch"
     
     # Étape 1: Récupérer tous les commits avec bugs et fixes en une seule fois
     local bug_commits=$(git notes --ref=$BUG_NOTES_REF list 2>/dev/null | cut -d' ' -f2)
