@@ -281,6 +281,26 @@ list_fixes() {
     fi
 }
 
+# Fonction pour identifier précisément la branche contenant un commit
+get_branch_containing_commit() {
+    local commit="$1"
+    
+    # Méthode simple et efficace: prendre la première branche qui contient le commit
+    local branch=$(git branch --contains "$commit" 2>/dev/null | head -1 | sed 's/^[[:space:]\*]*//')
+    
+    # Si c'est vide, essayer les branches distantes
+    if [ -z "$branch" ]; then
+        branch=$(git branch -r --contains "$commit" 2>/dev/null | head -1 | sed 's/^[[:space:]]*//' | sed 's/origin\///')
+    fi
+    
+    # Nettoyer et retourner
+    if [ -n "$branch" ] && [ "$branch" != "HEAD" ] && [ "$branch" != "(HEAD" ]; then
+        echo "$branch"
+    else
+        echo "branche-inconnue"
+    fi
+}
+
 # Détecter les corrections manquantes sur une branche/tag
 detect_missing_fixes() {
     local target_branch=$1
@@ -400,13 +420,17 @@ detect_missing_fixes() {
                                     fix_short=$(get_short_hash "$potential_fix")
                                     related_short=$(get_short_hash "$related_commit")
                                     
-                                    # Identification rapide de la branche (optionnel, pour le rapport)
-                                    local fix_location="autres branches"
-                                    if git merge-base --is-ancestor "$potential_fix" "master" 2>/dev/null; then
-                                        fix_location="master"
-                                    elif git branch -r --contains "$potential_fix" 2>/dev/null | grep -q "version/" || \
-                                         git branch --contains "$potential_fix" 2>/dev/null | grep -q "version/"; then
-                                        fix_location="version/*"
+                                    # Identification DIRECTE de la branche contenant le correctif
+                                    local fix_location=$(git branch --contains "$potential_fix" 2>/dev/null | head -1 | sed 's/^[[:space:]\*]*//')
+                                    
+                                    # Si vide, essayer les branches distantes
+                                    if [ -z "$fix_location" ]; then
+                                        fix_location=$(git branch -r --contains "$potential_fix" 2>/dev/null | head -1 | sed 's/^[[:space:]]*//' | sed 's/origin\///')
+                                    fi
+                                    
+                                    # Si toujours vide, utiliser fallback
+                                    if [ -z "$fix_location" ] || [ "$fix_location" = "HEAD" ]; then
+                                        fix_location="autres branches"
                                     fi
                                     
                                     echo -e "  ${RED}🚨 CORRECTION TROUVÉE sur $fix_location: commit $fix_short${NC}"
