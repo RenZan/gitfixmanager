@@ -307,9 +307,6 @@ select_bug_interactive() {
         echo
     done
     
-    echo -e "${INFO_ICON} ${CYAN}Correction sera marquée sur commit: ${BOLD}$(git rev-parse --short HEAD)${NC}"
-    echo
-    
     # Sélection
     while true; do
         read -p "Choisissez un numéro (1-${#bug_ids[@]}) ou 'q' pour quitter: " choice
@@ -329,10 +326,74 @@ select_bug_interactive() {
     done
 }
 
+# Sélectionner un commit de correction de manière interactive
+select_fix_commit_interactive() {
+    echo -e "${FIX_ICON} ${BOLD}Sélection du commit de correction${NC}"
+    echo -e "${CYAN}========================================${NC}"
+    echo
+    
+    # Afficher les derniers commits comme options
+    echo -e "${INFO_ICON} ${CYAN}Commits récents disponibles :${NC}"
+    echo
+    
+    # Récupérer les 10 derniers commits
+    local commits=($(git log --oneline -10 --format="%H"))
+    local commit_shorts=($(git log --oneline -10 --format="%h"))
+    local commit_subjects=($(git log --oneline -10 --format="%s"))
+    
+    # Affichage de la liste
+    for i in "${!commits[@]}"; do
+        local index=$((i + 1))
+        echo -e "  ${BOLD}${YELLOW}[$index]${NC} ${BOLD}${commit_shorts[$i]}${NC} ${commit_subjects[$i]}"
+    done
+    
+    echo
+    echo -e "  ${BOLD}${YELLOW}[H]${NC} ${BOLD}HEAD${NC} (commit actuel)"
+    echo -e "  ${BOLD}${YELLOW}[C]${NC} Saisir un commit spécifique"
+    echo
+    
+    # Sélection
+    while true; do
+        read -p "Choisissez une option (1-${#commits[@]}, H, C) ou 'q' pour quitter: " choice
+        
+        if [[ "$choice" == "q" || "$choice" == "Q" ]]; then
+            return 1
+        fi
+        
+        if [[ "$choice" == "h" || "$choice" == "H" ]]; then
+            SELECTED_FIX_COMMIT=$(git rev-parse HEAD)
+            echo -e "${INFO_ICON} ${GREEN}Commit sélectionné: $(git rev-parse --short HEAD) (HEAD)${NC}"
+            return 0
+        fi
+        
+        if [[ "$choice" == "c" || "$choice" == "C" ]]; then
+            echo
+            read -p "Entrez le hash du commit (court ou complet): " custom_commit
+            if git rev-parse --verify "$custom_commit" >/dev/null 2>&1; then
+                SELECTED_FIX_COMMIT=$(git rev-parse "$custom_commit")
+                echo -e "${INFO_ICON} ${GREEN}Commit sélectionné: $(git rev-parse --short $custom_commit)${NC}"
+                return 0
+            else
+                echo -e "${ERROR_ICON} ${RED}Commit invalide: $custom_commit${NC}"
+                continue
+            fi
+        fi
+        
+        if [[ "$choice" =~ ^[0-9]+$ ]] && [[ $choice -ge 1 ]] && [[ $choice -le ${#commits[@]} ]]; then
+            local selected_index=$((choice - 1))
+            SELECTED_FIX_COMMIT="${commits[$selected_index]}"
+            echo -e "${INFO_ICON} ${GREEN}Commit sélectionné: ${commit_shorts[$selected_index]}${NC}"
+            return 0
+        else
+            echo -e "${ERROR_ICON} ${RED}Choix invalide. Utilisez un numéro entre 1 et ${#commits[@]}, H, C ou 'q'${NC}"
+        fi
+    done
+}
+
 # Marquer une correction de manière interactive
 mark_fix_interactive() {
     local bug_id="$1"
-    local fix_commit=$(git rev-parse HEAD)
+    local fix_commit=""
     
     # Si aucun bug_id fourni, proposer la sélection interactive
     if [[ -z "$bug_id" ]]; then
@@ -355,6 +416,16 @@ mark_fix_interactive() {
             echo -e "${INFO_ICON} ${YELLOW}Aucun bug sélectionné${NC}"
             return 1
         fi
+    fi
+    
+    # Maintenant sélectionner le commit de correction
+    echo
+    if select_fix_commit_interactive; then
+        fix_commit="$SELECTED_FIX_COMMIT"
+    else
+        echo
+        echo -e "${INFO_ICON} ${YELLOW}Sélection du commit annulée${NC}"
+        return 1
     fi
     
     # Trouver le commit du bug
