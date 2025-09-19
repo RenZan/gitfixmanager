@@ -352,15 +352,15 @@ select_fix_commit_interactive() {
     echo -e "${INFO_ICON} ${CYAN}Commits récents disponibles :${NC}"
     echo
     
-    # Récupérer les 10 derniers commits
+    # Récupérer les 10 derniers commits avec leurs informations
     local commits=($(git log --oneline -10 --format="%H"))
     local commit_shorts=($(git log --oneline -10 --format="%h"))
-    local commit_subjects=($(git log --oneline -10 --format="%s"))
     
-    # Affichage de la liste
+    # Affichage de la liste avec récupération individuelle des sujets
     for i in "${!commits[@]}"; do
         local index=$((i + 1))
-        echo -e "  ${BOLD}${YELLOW}[$index]${NC} ${BOLD}${commit_shorts[$i]}${NC} ${commit_subjects[$i]}"
+        local commit_subject=$(git log -1 --format="%s" "${commits[$i]}")
+        echo -e "  ${BOLD}${YELLOW}[$index]${NC} ${BOLD}${commit_shorts[$i]}${NC} ${commit_subject}"
     done
     
     echo

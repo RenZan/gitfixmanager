@@ -78,34 +78,47 @@ find_cherry_pick_original() {
 # Trouver tous les commits cherry-pickés d'un commit original
 find_cherry_pick_copies() {
     local original_commit=$1
+    local results=""
     
     # Méthode 1: Chercher par référence directe au commit
     local direct_refs=$(git log --all --grep="cherry picked from commit $original_commit" --format="%H" 2>/dev/null)
+    results="$results $direct_refs"
     
-    # Méthode 2: Chercher par message de commit similaire (pour les PR cherry-picks)
-    local original_title=$(git show --format="%s" -s "$original_commit" 2>/dev/null | head -1)
-    local similar_commits=""
-    
+    # Méthode 2: Chercher par titre de commit similaire (pour les PR cherry-picks)
+    local original_title=$(git show --format="%s" -s "$original_commit" 2>/dev/null)
     if [ -n "$original_title" ]; then
-        # Chercher des commits avec le même titre mais différents hash
-        similar_commits=$(git log --all --oneline --grep="$(echo "$original_title" | sed 's/[.*]/\\&/g')" --format="%H" 2>/dev/null | grep -v "^$original_commit$")
+        # Extraire les mots-clés principaux du titre (pour éviter les faux positifs)
+        local key_words=$(echo "$original_title" | grep -o "[A-Za-z]\{4,\}" | head -5 | tr '\n' ' ')
         
-        # Filtrer pour ne garder que ceux qui ressemblent vraiment à des cherry-picks
-        if [ -n "$similar_commits" ]; then
-            local filtered_similar=""
-            for commit in $similar_commits; do
-                local commit_msg=$(git show --format='%B' -s "$commit" 2>/dev/null)
-                # Vérifier si le message contient des indices de cherry-pick
-                if echo "$commit_msg" | grep -qi "cherry\|pick\|pr\|pull request\|merge"; then
-                    filtered_similar="$filtered_similar $commit"
-                fi
+        if [ -n "$key_words" ]; then
+            # Chercher les commits contenant ces mots-clés
+            for word in $key_words; do
+                local matching_commits=$(git log --all --grep="$word" --format="%H" 2>/dev/null)
+                for commit in $matching_commits; do
+                    if [ "$commit" != "$original_commit" ]; then
+                        # Vérifier si c'est vraiment un cherry-pick en cherchant des indices
+                        local commit_msg=$(git show --format='%B' -s "$commit" 2>/dev/null)
+                        if echo "$commit_msg" | grep -qi "cherry\|pick\|merge.*pr"; then
+                            results="$results $commit"
+                        fi
+                    fi
+                done
             done
-            similar_commits="$filtered_similar"
         fi
     fi
     
-    # Combiner les résultats et dédupliquer
-    echo "$direct_refs $similar_commits" | tr ' ' '\n' | grep -v "^$" | sort -u | tr '\n' ' '
+    # Méthode 3: Chercher par numéro de PR mentionné dans le message
+    local original_msg=$(git show --format='%B' -s "$original_commit" 2>/dev/null)
+    local pr_numbers=$(echo "$original_msg" | grep -o "PR [0-9]\+" | grep -o "[0-9]\+" | head -3)
+    for pr in $pr_numbers; do
+        if [ -n "$pr" ]; then
+            local pr_commits=$(git log --all --grep="$pr" --format="%H" 2>/dev/null)
+            results="$results $pr_commits"
+        fi
+    done
+    
+    # Dédupliquer et nettoyer
+    echo "$results" | tr ' ' '\n' | grep -v "^$" | grep -v "^$original_commit$" | sort -u | tr '\n' ' '
 }
 
 # Propager automatiquement les notes vers les commits cherry-pickés
@@ -182,26 +195,24 @@ scan_and_inherit_cherry_picks() {
         local note_content=$(git notes --ref="$ref_type" show "$commit_with_note" 2>/dev/null)
         
         if [ -n "$note_content" ]; then
-            # Chercher tous les cherry-picks de ce commit
+            # Chercher tous les cherry-picks de ce commit avec notre fonction améliorée
             local cherry_picks=$(find_cherry_pick_copies "$commit_with_note")
             
-            # Propager la note vers tous les cherry-picks trouvés
-            if [ -n "$cherry_picks" ]; then
-                echo "$cherry_picks" | while read cherry_commit; do
-                    if [ -n "$cherry_commit" ] && [ "$cherry_commit" != "$commit_with_note" ]; then
-                        # Vérifier si une note n'existe pas déjà
-                        if ! git notes --ref="$ref_type" show "$cherry_commit" >/dev/null 2>&1; then
-                            git notes --ref="$ref_type" add -m "$note_content" "$cherry_commit" 2>/dev/null
-                            if [ $? -eq 0 ]; then
-                                local short_cherry=$(git rev-parse --short "$cherry_commit" 2>/dev/null || echo "N/A")
-                                local short_original=$(git rev-parse --short "$commit_with_note" 2>/dev/null || echo "N/A")
-                                echo -e "${GREEN}  ✓ Note héritée: $short_original → $short_cherry${NC}"
-                                inherited_count=$((inherited_count + 1))
-                            fi
+            # Traiter chaque cherry-pick trouvé
+            for cherry_commit in $cherry_picks; do
+                if [ -n "$cherry_commit" ] && [ "$cherry_commit" != "$commit_with_note" ]; then
+                    # Vérifier si une note n'existe pas déjà
+                    if ! git notes --ref="$ref_type" show "$cherry_commit" >/dev/null 2>&1; then
+                        git notes --ref="$ref_type" add -m "$note_content" "$cherry_commit" 2>/dev/null
+                        if [ $? -eq 0 ]; then
+                            local short_cherry=$(git rev-parse --short "$cherry_commit" 2>/dev/null || echo "N/A")
+                            local short_original=$(git rev-parse --short "$commit_with_note" 2>/dev/null || echo "N/A")
+                            echo -e "${GREEN}  ✓ Note héritée: $short_original → $short_cherry${NC}"
+                            inherited_count=$((inherited_count + 1))
                         fi
                     fi
-                done
-            fi
+                fi
+            done
         fi
     done
     
@@ -462,24 +473,6 @@ detect_missing_fixes() {
             # Vérifier directement si fix est dans target_branch
             for potential_fix in $fix_commits; do
                 # Vérification: ce fix est-il dans target_branch ?
-                if git merge-base --is-ancestor "$potential_fix" "$target_branch" 2>/dev/null; then
-                    # Vérifier si cette correction référence n'importe lequel des commits liés
-                    local fix_note=$(git notes --ref=$FIX_NOTES_REF show "$potential_fix" 2>/dev/null)
-                    if [ -n "$fix_note" ]; then
-                        for related_commit in $related_commits; do
-                            if echo "$fix_note" | grep -q "FIX:$bug_id:fixes-commit:$related_commit"; then
-                                fix_in_target=true
-                                fix_short=$(get_short_hash "$potential_fix")
-                                echo -e "  ${GREEN}✅ Correction trouvée dans $target_branch: commit $fix_short${NC}"
-                                break 2  # Sortir des deux boucles
-                            fi
-                        done
-                    fi
-                fi
-            done
-            
-            for potential_fix in $fix_commits; do
-                # Vérifier si ce fix est dans la branche cible
                 if git merge-base --is-ancestor "$potential_fix" "$target_branch" 2>/dev/null; then
                     # Vérifier si cette correction référence n'importe lequel des commits liés
                     local fix_note=$(git notes --ref=$FIX_NOTES_REF show "$potential_fix" 2>/dev/null)
