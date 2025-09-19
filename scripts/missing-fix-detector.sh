@@ -110,18 +110,37 @@ find_cherry_pick_copies() {
         fi
     fi
     
-    # Méthode 3: Chercher par numéro de PR mentionné dans le message
+    # Méthode 3: Chercher par numéro de PR mentionné dans le message (très strict)
     local original_msg=$(git show --format='%B' -s "$original_commit" 2>/dev/null)
-    local pr_numbers=$(echo "$original_msg" | grep -o "PR [0-9]\+" | grep -o "[0-9]\+" | head -3)
+    # Seulement chercher des formats PR explicites et spécifiques
+    local pr_numbers=$(echo "$original_msg" | grep -o "PR[ #][0-9]\{3,\}" | grep -o "[0-9]\{3,\}" | head -2)
     for pr in $pr_numbers; do
-        if [ -n "$pr" ]; then
-            local pr_commits=$(git log --all --grep="$pr" --format="%H" 2>/dev/null)
-            results="$results $pr_commits"
+        if [ -n "$pr" ] && [ ${#pr} -ge 3 ]; then
+            # Recherche très stricte : doit mentionner explicitement PR + numéro
+            local pr_commits=$(git log --all --grep="PR[ #]*$pr\b\|#$pr\b" --format="%H" 2>/dev/null)
+            for commit in $pr_commits; do
+                if [ "$commit" != "$original_commit" ]; then
+                    # Double vérification : le commit doit explicitement mentionner cherry-pick OU PR
+                    local commit_msg=$(git show --format='%B' -s "$commit" 2>/dev/null)
+                    if echo "$commit_msg" | grep -qi "cherry.*pick\|picked.*from\|PR[ #]*$pr"; then
+                        results="$results $commit"
+                    fi
+                fi
+            done
         fi
     done
     
-    # Dédupliquer et nettoyer
-    echo "$results" | tr ' ' '\n' | grep -v "^$" | grep -v "^$original_commit$" | sort -u | tr '\n' ' '
+    # Dédupliquer, nettoyer et LIMITER pour éviter l'héritage massif
+    local clean_results=$(echo "$results" | tr ' ' '\n' | grep -v "^$" | grep -v "^$original_commit$" | sort -u)
+    local result_count=$(echo "$clean_results" | wc -l)
+    
+    # SÉCURITÉ: Si plus de 5 résultats, c'est suspect - ne retourner que les 3 premiers
+    if [ "$result_count" -gt 5 ]; then
+        echo "🚨 ALERTE: $result_count cherry-picks détectés pour $original_commit - Limitation à 3" >&2
+        echo "$clean_results" | head -3 | tr '\n' ' '
+    else
+        echo "$clean_results" | tr '\n' ' '
+    fi
 }
 
 # Propager automatiquement les notes vers les commits cherry-pickés
