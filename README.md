@@ -1,7 +1,7 @@
 # Git Fix Manager
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/RenZan/gitfixmanager/releases)
+[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](https://github.com/RenZan/gitfixmanager/releases)
 [![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20WSL-lightgrey.svg)](https://github.com/RenZan/gitfixmanager)
 
 Git Fix Manager marque les bugs et leurs corrections à travers les branches et garantit que les corrections critiques sont propagées dans tout votre code.
@@ -112,7 +112,7 @@ Marquez bugs et corrections sur n'importe quel commit, pas seulement HEAD :
 # Marquer un bug sur un commit spécifique
 gfm bug "Fuite mémoire" abc1234
 gfm bug "Problème de sécurité" HEAD~3
-gfm bug "Régression" v1.0.0
+gfm bug "Régression" v1.1.0
 
 # Marquer une correction sur un commit spécifique
 gfm fix BUG-20250921-A1B2 def5678
@@ -183,7 +183,7 @@ gfm check
 
 # Vérifier une branche ou un tag spécifique
 gfm check release/v2.1.0
-gfm check v1.0.0
+gfm check v1.1.0
 ```
 
 ## Référence des commandes
