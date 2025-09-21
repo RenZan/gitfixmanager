@@ -1,7 +1,6 @@
 #!/bin/bash
 
 # Git Fix Manager (gfm) - Interface simplifiée et intelligente
-# Version 1.0 - Outil professionnel de gestion des corrections
 # https://github.com/RenZan/gitfixmanager
 
 set -e
