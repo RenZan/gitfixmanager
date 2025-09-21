@@ -1,0 +1,29 @@
+# Git Fix Manager - .gitignore
+
+# Fichiers de test temporaires
+test.txt
+feature*.txt
+*.tmp
+
+# Logs et sorties de test
+*.log
+test-output/
+temp-repo/
+
+# Fichiers de sauvegarde
+*.bak
+*~
+
+# Fichiers système
+.DS_Store
+Thumbs.db
+
+# Environnements de développement
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Fichiers de configuration locale
+local-config.sh
+.env
