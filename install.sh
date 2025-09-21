@@ -60,9 +60,15 @@ BASE_URL="https://raw.githubusercontent.com/RenZan/gitfixmanager/main"
 if command -v curl &> /dev/null; then
     curl -fsSL "$BASE_URL/gfm" -o "$BIN_DIR/gfm"
     curl -fsSL "$BASE_URL/scripts/missing-fix-detector.sh" -o "$INSTALL_DIR/missing-fix-detector.sh"
+    curl -fsSL "$BASE_URL/scripts/git-bug" -o "$BIN_DIR/git-bug"
+    curl -fsSL "$BASE_URL/scripts/git-fix" -o "$BIN_DIR/git-fix"
+    curl -fsSL "$BASE_URL/scripts/git-bugcheck" -o "$BIN_DIR/git-bugcheck"
 else
     wget -q "$BASE_URL/gfm" -O "$BIN_DIR/gfm"
     wget -q "$BASE_URL/scripts/missing-fix-detector.sh" -O "$INSTALL_DIR/missing-fix-detector.sh"
+    wget -q "$BASE_URL/scripts/git-bug" -O "$BIN_DIR/git-bug"
+    wget -q "$BASE_URL/scripts/git-fix" -O "$BIN_DIR/git-fix"
+    wget -q "$BASE_URL/scripts/git-bugcheck" -O "$BIN_DIR/git-bugcheck"
 fi
 
 # Créer le répertoire scripts et faire le lien
@@ -71,6 +77,9 @@ cp "$INSTALL_DIR/missing-fix-detector.sh" "$INSTALL_DIR/scripts/"
 
 # Rendre exécutable
 chmod +x "$BIN_DIR/gfm"
+chmod +x "$BIN_DIR/git-bug"
+chmod +x "$BIN_DIR/git-fix"
+chmod +x "$BIN_DIR/git-bugcheck"
 chmod +x "$INSTALL_DIR/scripts/missing-fix-detector.sh"
 
 # Modifier gfm pour pointer vers la bonne installation
@@ -118,6 +127,12 @@ if [[ ":$PATH:" == *":$BIN_DIR:"* ]] || [[ "$PATH_ADDED" == true ]]; then
     echo -e "   ${GREEN}gfm bug \"Description\"${NC}    # Marquer un bug"
     echo -e "   ${GREEN}gfm fix BUG-ID${NC}           # Marquer une correction"
     echo -e "   ${GREEN}gfm check${NC}                # Vérifier corrections"
+    echo ""
+    echo -e "${BLUE}🎯 Commandes Git natives:${NC}"
+    echo -e "   ${GREEN}git bug${NC}                  # Mode interactif"
+    echo -e "   ${GREEN}git bug \"Description\"${NC}    # Marquer un bug"
+    echo -e "   ${GREEN}git fix BUG-ID${NC}           # Marquer une correction"
+    echo -e "   ${GREEN}git bugcheck${NC}             # Vérifier corrections"
     
     if [[ "$PATH_ADDED" == true ]]; then
         echo ""

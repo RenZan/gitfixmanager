@@ -1,0 +1,5 @@
+#!/bin/bash
+# Git Bugcheck - Extension pour Git Fix Manager
+# Redirige vers gfm check
+
+exec gfm check "$@"

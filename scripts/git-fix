@@ -1,0 +1,5 @@
+#!/bin/bash
+# Git Fix - Extension pour Git Fix Manager
+# Redirige vers gfm fix
+
+exec gfm fix "$@"

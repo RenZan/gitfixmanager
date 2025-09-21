@@ -69,13 +69,37 @@ cd gitfixmanager
 ./install-smart.sh
 ```
 
-Ceci installe la commande `gfm` sur tout le système.
+Ceci installe la commande `gfm` et les extensions Git natives sur tout le système.
+
+## Utilisation - Deux interfaces disponibles
+
+### 🎯 Interface Git native (recommandée)
+```bash
+# Mode interactif guidé
+git bug
+
+# Commandes directes  
+git bug "Description du problème"
+git fix BUG-20250921-A1B2
+git bugcheck
+```
+
+### 🚀 Interface GFM classique
+```bash
+# Mode interactif guidé
+gfm
+
+# Commandes directes
+gfm bug "Description du problème"
+gfm fix BUG-20250921-A1B2
+gfm check
+```
 
 ## Utilisation avancée - Commandes directes
 
 ### 1. Marquer un bug
 ```bash
-gfm bug "Fuite mémoire dans l'authentification"
+git bug "Fuite mémoire dans l'authentification"
 # Génère : BUG-20250921-A1B2
 ```
 

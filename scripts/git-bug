@@ -1,0 +1,11 @@
+#!/bin/bash
+# Git Bug - Extension pour Git Fix Manager
+# Redirige vers gfm avec gestion intelligente des arguments
+
+# Si aucun argument, lancer le mode interactif
+if [ $# -eq 0 ]; then
+    exec gfm
+else
+    # Sinon, passer tous les arguments à gfm bug
+    exec gfm bug "$@"
+fi
