@@ -198,6 +198,7 @@ gfm check v1.0.0
 | `gfm status` | `gfm s` | Statut du dépôt | `gfm status` |
 | `gfm interactive` | `gfm i` | Mode interactif | `gfm interactive` |
 | `gfm help` | `gfm h` | Aide contextuelle | `gfm help fix` |
+| `gfm update` | | Vérifier les mises à jour | `gfm update` |
 
 **Note** : Le paramètre `[commit]` est optionnel. S'il est omis, utilise HEAD (commit actuel).
 

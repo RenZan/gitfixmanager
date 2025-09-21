@@ -94,6 +94,61 @@ check_detector() {
     fi
 }
 
+# Vérification et mise à jour de gfm
+check_for_updates() {
+    echo -e "${INFO_ICON} ${CYAN}Vérification des mises à jour...${NC}"
+    
+    # Obtenir la dernière version depuis GitHub
+    if command -v curl &> /dev/null; then
+        latest_version=$(curl -s --connect-timeout 10 https://api.github.com/repos/RenZan/gitfixmanager/releases/latest 2>/dev/null | grep '"tag_name"' | cut -d'"' -f4 2>/dev/null || echo "")
+    elif command -v wget &> /dev/null; then
+        latest_version=$(wget --timeout=10 -qO- https://api.github.com/repos/RenZan/gitfixmanager/releases/latest 2>/dev/null | grep '"tag_name"' | cut -d'"' -f4 2>/dev/null || echo "")
+    else
+        echo -e "${ERROR_ICON} ${RED}curl ou wget requis pour vérifier les mises à jour${NC}"
+        exit 1
+    fi
+    
+    # Si l'API GitHub ne fonctionne pas, essayer une approche alternative
+    if [[ -z "$latest_version" ]]; then
+        echo -e "${WARNING_ICON} ${YELLOW}API GitHub inaccessible, vérification via tags Git...${NC}"
+        if command -v curl &> /dev/null; then
+            latest_version=$(curl -s --connect-timeout 10 https://raw.githubusercontent.com/RenZan/gitfixmanager/main/gfm 2>/dev/null | grep '^VERSION=' | cut -d'"' -f2 | head -1 || echo "")
+            if [[ -n "$latest_version" ]]; then
+                latest_version="v$latest_version"
+            fi
+        fi
+    fi
+    
+    if [[ -z "$latest_version" ]]; then
+        echo -e "${ERROR_ICON} ${RED}Impossible de vérifier les mises à jour${NC}"
+        echo -e "${INFO_ICON} ${CYAN}Vérifiez votre connexion Internet et réessayez${NC}"
+        exit 1
+    fi
+    
+    # Comparer les versions
+    if [[ "$latest_version" == "v$VERSION" ]]; then
+        echo -e "${SUCCESS_ICON} ${GREEN}Git Fix Manager est à jour (version $VERSION)${NC}"
+    else
+        echo -e "${WARNING_ICON} ${YELLOW}Nouvelle version disponible : $latest_version (actuelle: v$VERSION)${NC}"
+        echo ""
+        read -p "Voulez-vous mettre à jour ? (y/N): " choice
+        case $choice in
+            [Yy]|[Oo])
+                echo -e "${INFO_ICON} ${CYAN}Téléchargement et installation de la mise à jour...${NC}"
+                if command -v curl &> /dev/null; then
+                    curl -fsSL https://raw.githubusercontent.com/RenZan/gitfixmanager/main/install.sh | bash
+                else
+                    wget -qO- https://raw.githubusercontent.com/RenZan/gitfixmanager/main/install.sh | bash
+                fi
+                echo -e "${SUCCESS_ICON} ${GREEN}Mise à jour terminée !${NC}"
+                ;;
+            *)
+                echo -e "${INFO_ICON} ${CYAN}Mise à jour annulée${NC}"
+                ;;
+        esac
+    fi
+}
+
 # Génération d'ID de bug automatique et intelligent
 generate_bug_id() {
     local description="$1"
@@ -635,6 +690,7 @@ show_help() {
             echo "  gfm interactive        Mode interactif guidé"
             echo "  gfm help [commande]    Aide spécifique"
             echo "  gfm --version          Version"
+            echo "  gfm update             Vérifier et installer les mises à jour"
             echo
             echo -e "${BOLD}Exemples rapides :${NC}"
             echo -e "  ${CYAN}gfm bug \"Memory leak detected\"${NC}"
@@ -697,6 +753,11 @@ main() {
         "--version"|"-v")
             check_basic_prerequisites
             echo "Git Fix Manager v$VERSION"
+            exit 0
+            ;;
+        "update")
+            check_basic_prerequisites
+            check_for_updates
             exit 0
             ;;
         
