@@ -1,0 +1,40 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Get version
+      id: get_version
+      run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+    
+    - name: Create release artifacts
+      run: |
+        mkdir -p dist
+        cp -r gfm scripts lib locales install.sh README.md LICENSE VERSION dist/
+        cd dist && tar -czf ../gitfixmanager-${{ steps.get_version.outputs.VERSION }}.tar.gz .
+        cd ..
+    
+    - name: Generate checksums
+      run: |
+        sha256sum gitfixmanager-*.tar.gz > checksums.txt
+    
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          gitfixmanager-*.tar.gz
+          checksums.txt
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
