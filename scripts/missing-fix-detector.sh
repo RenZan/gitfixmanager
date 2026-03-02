@@ -1,4 +1,16 @@
 #!/bin/bash
+set -euo pipefail
+declare -a __TEMP_FILES=()
+mktemp_missing() {
+  local _tmp
+  _tmp=$(mktemp /tmp/missing_fixes.XXXXXXXXXX) || {
+    echo "Error: mktemp failed to create a temporary file" >&2
+    exit 1
+  }
+  __TEMP_FILES+=("$_tmp")
+  printf "%s" "$_tmp"
+}
+trap 'for _f in "${__TEMP_FILES[@]}"; do rm -f "$_f" 2>/dev/null || true; done' EXIT
 # missing-fix-detector.sh
 # Script de détection des corrections manquantes sur les branches/tags
 # Détecte quand un bug est présent sur une branche mais sa correction existe ailleurs
@@ -12,7 +24,7 @@ declare -A SHORT_HASH_CACHE
 # Fonction pour obtenir les hash courts
 get_short_hash() {
     local commit=$1
-    if [[ -z "${SHORT_HASH_CACHE[$commit]}" ]]; then
+    if [[ -z "${SHORT_HASH_CACHE[$commit]+_}" ]]; then
         SHORT_HASH_CACHE[$commit]=$(git rev-parse --short "$commit" 2>/dev/null || echo "N/A")
     fi
     echo "${SHORT_HASH_CACHE[$commit]}"
@@ -199,6 +211,7 @@ propagate_to_cherry_picks() {
             fi
         done
     fi
+    return 0
 }
 
 # Obtenir tous les commits liés (original + cherry-picks)
@@ -300,7 +313,7 @@ propagate_from_original() {
             fi
         fi
     fi
-    return 1
+    return 0
 }
 
 # Marquer un commit comme bug
@@ -544,8 +557,9 @@ detect_missing_fixes() {
     echo ""
     
     local missing_fixes=0
-    local temp_file="/tmp/missing_fixes_$$"
-    rm -f "$temp_file"
+    local temp_file
+    temp_file="$(mktemp_missing)"
+    __TEMP_FILES+=("$temp_file")
     
     # Analyser seulement les bugs présents dans target_branch
     for commit in $bug_commits; do
@@ -778,7 +792,7 @@ case "$1" in
         list_bugs
         ;;
     list-bugs-current)
-        list_bugs_current_branch "$2"
+        list_bugs_current_branch "${2:-HEAD}"
         ;;
     list-fixes)
         list_fixes

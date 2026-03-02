@@ -6,8 +6,8 @@
 set -e
 
 # Configuration
-VERSION="1.2.0"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+VERSION=$(cat "${SCRIPT_DIR}/VERSION" 2>/dev/null || echo "unknown")
 DETECTOR="$SCRIPT_DIR/scripts/missing-fix-detector.sh"
 
 # Support pour installation globale - mais vérifier d'abord que le fichier local existe
