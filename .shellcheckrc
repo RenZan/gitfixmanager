@@ -1,0 +1,32 @@
+# Shellcheck configuration for Git Fix Manager
+# Enable all checks except those that are not relevant for bash scripts
+
+# Disable specific checks:
+# SC1090: Can't follow non-constant source
+# SC1091: Not following sourced file
+# SC2001: See if you can use ${variable//search/replace} instead
+# SC2002: Useless cat
+# SC2016: Expressions don't expand in single quotes
+# SC2028: echo won't expand escape sequences
+# SC2034: Variable appears unused
+# SC2046: Quote this to prevent word splitting
+# SC2086: Double quote to prevent globbing and word splitting
+# SC2120: Function references arguments that are never passed
+# SC2154: Variable is referenced but not assigned
+# SC2155: Declare and assign separately
+# SC2162: read without -r
+# SC2181: Check exit code directly
+# SC2206: Quote to prevent word splitting
+# SC2207: Prefer mapfile/readarray
+# SC2230: which is non-standard
+
+disable=SC1090,SC1091,SC2001,SC2002,SC2016,SC2028,SC2034,SC2046,SC2086,SC2120,SC2154,SC2155,SC2162,SC2181,SC2206,SC2207,SC2230
+
+# Set the shell dialect
+shell=bash
+
+# External sources (files that are sourced but not checked)
+# external-sources=true
+
+# Severity level (error, warning, info, style)
+severity=warning

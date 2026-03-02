@@ -8,6 +8,73 @@ set -e
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VERSION=$(cat "${SCRIPT_DIR}/VERSION" 2>/dev/null || echo "unknown")
+
+# i18n support - Language selection via GFM_LANG environment variable
+GFM_LANG="${GFM_LANG:-en}"
+_() {
+    local key="$1"
+    case "$GFM_LANG" in
+        fr)
+            case "$key" in
+                "interactive_mode") echo "Mode Interactif" ;;
+                "mark_bug") echo "Marquer un bug" ;;
+                "mark_fix") echo "Marquer une correction" ;;
+                "check_fixes") echo "Vérifier les corrections" ;;
+                "list_items") echo "Lister bugs/corrections" ;;
+                "view_status") echo "Voir le statut" ;;
+                "quit") echo "Quitter" ;;
+                "bug_marked") echo "Bug marqué avec succès" ;;
+                "fix_marked") echo "Correction marquée avec succès" ;;
+                "all_fixes_present") echo "Toutes les corrections sont présentes" ;;
+                "fixes_missing") echo "Des corrections manquent" ;;
+                "description_required") echo "Description requise" ;;
+                "commit_required") echo "Commit requis" ;;
+                "invalid_choice") echo "Choix invalide" ;;
+                "commit_not_found") echo "Commit non trouvé" ;;
+                "checking_updates") echo "Vérification des mises à jour" ;;
+                "update_available") echo "Nouvelle version disponible" ;;
+                "up_to_date") echo "est à jour" ;;
+                "update_complete") echo "Mise à jour terminée" ;;
+                "update_cancelled") echo "Mise à jour annulée" ;;
+                "git_not_installed") echo "Git n'est pas installé" ;;
+                "not_git_repo") echo "Vous devez être dans un repository Git" ;;
+                "detector_not_found") echo "Script de détection non trouvé" ;;
+                "use_fix_command") echo "Utilisez 'gfm fix' quand vous l'aurez corrigé" ;;
+                *) echo "$key" ;;
+            esac
+            ;;
+        *)
+            case "$key" in
+                "interactive_mode") echo "Interactive Mode" ;;
+                "mark_bug") echo "Mark a bug" ;;
+                "mark_fix") echo "Mark a fix" ;;
+                "check_fixes") echo "Check fixes" ;;
+                "list_items") echo "List bugs/fixes" ;;
+                "view_status") echo "View status" ;;
+                "quit") echo "Quit" ;;
+                "bug_marked") echo "Bug marked successfully" ;;
+                "fix_marked") echo "Fix marked successfully" ;;
+                "all_fixes_present") echo "All fixes are present" ;;
+                "fixes_missing") echo "Some fixes are missing" ;;
+                "description_required") echo "Description required" ;;
+                "commit_required") echo "Commit required" ;;
+                "invalid_choice") echo "Invalid choice" ;;
+                "commit_not_found") echo "Commit not found" ;;
+                "checking_updates") echo "Checking for updates" ;;
+                "update_available") echo "New version available" ;;
+                "up_to_date") echo "is up to date" ;;
+                "update_complete") echo "Update complete" ;;
+                "update_cancelled") echo "Update cancelled" ;;
+                "git_not_installed") echo "Git is not installed" ;;
+                "not_git_repo") echo "You must be in a Git repository" ;;
+                "detector_not_found") echo "Detector script not found" ;;
+                "use_fix_command") echo "Use 'gfm fix' when you have fixed it" ;;
+                *) echo "$key" ;;
+            esac
+            ;;
+    esac
+}
+
 DETECTOR="$SCRIPT_DIR/scripts/missing-fix-detector.sh"
 
 # Support pour installation globale - mais vérifier d'abord que le fichier local existe
@@ -208,15 +275,15 @@ interactive_mode() {
     echo -e "${ROCKET_ICON} ${BOLD}${CYAN}Git Fix Manager - Mode Interactif${NC}"
     echo -e "${CYAN}====================================${NC}"
     echo
-    echo -e "${INFO_ICON} Ce mode vous guide étape par étape"
+    echo -e "${INFO_ICON} This mode guides you step by step"
     echo
-    echo "Que voulez-vous faire ?"
-    echo "  1) ${BUG_ICON} Marquer un bug"
-    echo "  2) ${FIX_ICON} Marquer une correction"
-    echo "  3) ${CHECK_ICON} Vérifier les corrections"
-    echo "  4) ${LIST_ICON} Lister bugs/corrections"
-    echo "  5) ${STATUS_ICON} Voir le statut"
-    echo "  0) Quitter"
+    echo "What would you like to do?"
+    echo "  1) ${BUG_ICON} $(_ "mark_bug")"
+    echo "  2) ${FIX_ICON} $(_ "mark_fix")"
+    echo "  3) ${CHECK_ICON} $(_ "check_fixes")"
+    echo "  4) ${LIST_ICON} $(_ "list_items")"
+    echo "  5) ${STATUS_ICON} $(_ "view_status")"
+    echo "  0) $(_ "quit")"
     echo
     read -p "Votre choix (1-5, 0): " choice
     
@@ -658,35 +725,35 @@ show_help() {
             ;;
         *)
             echo -e "${ROCKET_ICON} ${BOLD}${CYAN}Git Fix Manager v$VERSION${NC}"
-            echo -e "${CYAN}Interface simplifiée pour la gestion des bugs et corrections${NC}"
+            echo -e "${CYAN}$(case "$GFM_LANG" in fr) echo "Interface simplifiée pour la gestion des bugs et corrections" ;; *) echo "Simplified interface for bug and fix management" ;; esac)${NC}"
             echo
-            echo -e "${BOLD}Commandes principales :${NC}"
-            echo -e "  ${BUG_ICON} gfm bug \"description\"      Marquer un bug"
-            echo -e "  ${FIX_ICON} gfm fix BUG-ID             Marquer une correction"
-            echo -e "  ${CHECK_ICON} gfm check [branche/tag]    Vérifier les corrections"
-            echo -e "  ${LIST_ICON} gfm list [bugs|fixes]      Lister bugs/corrections"
-            echo -e "  ${STATUS_ICON} gfm status                Statut du repository"
+            echo -e "${BOLD}$(case "$GFM_LANG" in fr) echo "Commandes principales :" ;; *) echo "Main commands:" ;; esac)${NC}"
+            echo -e "  ${BUG_ICON} gfm bug \"description\"      $(_ "mark_bug")"
+            echo -e "  ${FIX_ICON} gfm fix BUG-ID             $(_ "mark_fix")"
+            echo -e "  ${CHECK_ICON} gfm check [branch/tag]     $(_ "check_fixes")"
+            echo -e "  ${LIST_ICON} gfm list [bugs|fixes]      $(_ "list_items")"
+            echo -e "  ${STATUS_ICON} gfm status                $(_ "view_status")"
             echo
-            echo -e "${BOLD}Raccourcis :${NC}"
+            echo -e "${BOLD}$(case "$GFM_LANG" in fr) echo "Raccourcis :" ;; *) echo "Shortcuts:" ;; esac)${NC}"
             echo "  gfm b = gfm bug"
             echo "  gfm f = gfm fix"
             echo "  gfm c = gfm check"
             echo "  gfm l = gfm list"
             echo "  gfm s = gfm status"
             echo
-            echo -e "${BOLD}Autres commandes :${NC}"
-            echo "  gfm interactive        Mode interactif guidé"
-            echo "  gfm help [commande]    Aide spécifique"
+            echo -e "${BOLD}$(case "$GFM_LANG" in fr) echo "Autres commandes :" ;; *) echo "Other commands:" ;; esac)${NC}"
+            echo "  gfm interactive        $(_ "interactive_mode")"
+            echo "  gfm help [command]     $(case "$GFM_LANG" in fr) echo "Aide spécifique" ;; *) echo "Specific help" ;; esac)"
             echo "  gfm --version          Version"
-            echo "  gfm update             Vérifier et installer les mises à jour"
+            echo "  gfm update             $(case "$GFM_LANG" in fr) echo "Vérifier et installer les mises à jour" ;; *) echo "Check and install updates" ;; esac)"
             echo
-            echo -e "${BOLD}Exemples rapides :${NC}"
+            echo -e "${BOLD}$(case "$GFM_LANG" in fr) echo "Exemples rapides :" ;; *) echo "Quick examples:" ;; esac)${NC}"
             echo -e "  ${CYAN}gfm bug \"Memory leak detected\"${NC}"
             echo -e "  ${CYAN}gfm fix BUG-20250918-A1B2${NC}"
             echo -e "  ${CYAN}gfm check release/v1.0${NC}"
             echo
-            echo -e "${INFO_ICON} ${CYAN}Utilisez 'gfm interactive' pour un mode guidé${NC}"
-            echo -e "${INFO_ICON} ${CYAN}Documentation complète : https://github.com/RenZan/gitfixmanager${NC}"
+            echo -e "${INFO_ICON} ${CYAN}$(case "$GFM_LANG" in fr) echo "Utilisez 'gfm interactive' pour un mode guidé" ;; *) echo "Use 'gfm interactive' for a guided mode" ;; esac)${NC}"
+            echo -e "${INFO_ICON} ${CYAN}Documentation: https://github.com/RenZan/gitfixmanager${NC}"
             ;;
     esac
 }
