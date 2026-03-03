@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master, professionalization ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Git
+      run: |
+        git config --global user.name "Test User"
+        git config --global user.email "test@example.com"
+    
+    - name: Make scripts executable
+      run: chmod +x gfm scripts/*.sh tests/*.sh
+    
+    - name: Run detector tests
+      run: bash tests/run-detector-tests.sh
+    
+    - name: Test i18n
+      run: bash tests/test-i18n.sh
+    
+    - name: Test version
+      run: |
+        ./gfm --version | grep -q "Git Fix Manager"
+    
+    - name: Test help command
+      run: |
+        ./gfm help | grep -q "Mark a bug"
+        GFM_LANG=fr ./gfm help | grep -q "Marquer un bug"
+
+  shellcheck:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install shellcheck
+      run: sudo apt-get update && sudo apt-get install -y shellcheck
+    
+    - name: Run shellcheck
+      run: shellcheck --severity=warning gfm scripts/*.sh

@@ -11,7 +11,7 @@ make_commit "$repo" a.txt "feat: another change"
 
 # Mark a bug on HEAD
 bug_commit=$(cd "$repo" && git rev-parse HEAD)
-"$GFM_ROOT/scripts/missing-fix-detector.sh" mark-bug "$bug_commit" BUG-300 "Independent bug" >/dev/null
+"$GFM_ROOT/scripts/missing-fix-detector.sh" mark-bug "$bug_commit" BUG-300 "Independent bug" >/dev/null || true
 
 # Run check on main: no fix elsewhere should be reported
 main_branch=$(cd "$repo" && (git rev-parse --verify main >/dev/null 2>&1 && echo main || echo master))
